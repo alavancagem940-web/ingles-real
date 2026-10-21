@@ -1,0 +1,63 @@
+@import '@fontsource/nunito/latin-400.css';
+@import '@fontsource/nunito/latin-700.css';
+@import '@fontsource/nunito/latin-800.css';
+@import '@fontsource/nunito/latin-ext-400.css';
+@import '@fontsource/nunito/latin-ext-700.css';
+@import '@fontsource/nunito/latin-ext-800.css';
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Nunito', ui-rounded, system-ui, sans-serif;
+  --color-ink: #0b1f3a;
+  --color-card: #143154;
+  --color-line: #2a4a73;
+  --color-muted: #9bb0c9;
+  --color-green: #3dd68c;
+  --color-green-dark: #2bb574;
+  --color-green-soft: #123d2c;
+  --color-red: #ff6b6b;
+  --color-red-dark: #e25555;
+  --color-red-soft: #3d1518;
+  --color-gold: #e8b86d;
+  --color-blue: #4aa3ff;
+  --color-blue-dark: #2f86e0;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  background: #071525;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: #f4f7fb;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+@keyframes slide {
+  0% {
+    transform: translateX(-80%);
+  }
+  100% {
+    transform: translateX(180%);
+  }
+}
+
+@keyframes pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 6px 0 0 rgba(0, 0, 0, 0.35), 0 0 0 0 rgba(232, 184, 109, 0.4);
+  }
+  50% {
+    box-shadow: 0 6px 0 0 rgba(0, 0, 0, 0.35), 0 0 0 10px rgba(232, 184, 109, 0);
+  }
+}

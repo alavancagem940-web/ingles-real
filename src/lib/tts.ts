@@ -1,0 +1,431 @@
+import { type SpeakKind, toSpokenText } from './speech-persona'
+import {
+  DEFAULT_VOICE_ID,
+  FALLBACK_VOICE_ID,
+  HAPPY_PATH_ENGINE,
+  TTS_LANG,
+  TTS_PITCH,
+  TTS_RATE,
+  TTS_VOLUME,
+  type NeuralVoice,
+  type NeuralVoiceId,
+  isMpegBuffer,
+  persistVoiceId,
+  readStoredVoiceId,
+  ttsAssetHash,
+  ttsAssetPath,
+  voiceById,
+} from './microsoft-neural'
+
+export {
+  DEFAULT_VOICE_ID,
+  DEFAULT_VOICE_WHY,
+  FALLBACK_VOICE_ID,
+  HAPPY_PATH_ENGINE,
+  NEURAL_VOICES,
+  SSML_PITCH,
+  SSML_RATE,
+  TTS_LANG,
+  TTS_PITCH,
+  TTS_RATE,
+  TTS_VOLUME,
+  buildSsml,
+} from './microsoft-neural'
+
+export type { NeuralVoice, NeuralVoiceId } from './microsoft-neural'
+
+export type { SpeakKind }
+
+export type TtsEngine = typeof HAPPY_PATH_ENGINE | 'webspeech-fallback' | 'unavailable'
+
+export type TtsStatus = {
+  available: boolean
+  label: string
+  unlocked: boolean
+  hint: string | null
+  engine: TtsEngine
+  voiceId: NeuralVoiceId
+  voiceLabel: string
+}
+
+/** If packed MPEG is not playing by then, speak the English phrase with Web Speech. */
+export const MPEG_GRACE_MS = 480
+
+type StatusListener = (status: TtsStatus) => void
+
+const listeners = new Set<StatusListener>()
+
+const SILENT_WAV =
+  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA'
+
+const FALLBACK_HINT =
+  'Sem rede para a voz neural Jenny. Nesta vez o iPhone pode cair na voz do sistema — feche e abra de novo com internet.'
+
+const UNLOCK_EVENTS = ['pointerdown', 'touchstart', 'click', 'keydown'] as const
+
+let unlocked = false
+let engine: TtsEngine = HAPPY_PATH_ENGINE
+let voiceId: NeuralVoiceId = DEFAULT_VOICE_ID
+let hint: string | null = null
+let player: HTMLAudioElement | null = null
+let objectUrl: string | null = null
+let speakSeq = 0
+let neuralSeq = -1
+let graceTimer: ReturnType<typeof setTimeout> | null = null
+let resumeTimer: ReturnType<typeof setInterval> | null = null
+let unlockBound = false
+
+function hasAudioElement(): boolean {
+  return typeof Audio !== 'undefined'
+}
+
+function emit(): void {
+  const status = getTtsStatus()
+  for (const listener of listeners) listener(status)
+}
+
+function currentVoice(): NeuralVoice {
+  return voiceById(voiceId)
+}
+
+function formatLabel(voice: NeuralVoice, speechUnlocked: boolean): string {
+  if (engine === 'unavailable') return 'indisponível neste navegador'
+  if (!speechUnlocked) return `voz neural (${voice.label}) — toque para liberar o áudio`
+  if (engine === 'webspeech-fallback') return `voz do sistema (fallback) · ${voice.label}`
+  return `voz neural (${voice.label})`
+}
+
+function liveTtsUrl(): string {
+  const base = import.meta.env.BASE_URL || '/'
+  const prefix = base.endsWith('/') ? base : `${base}/`
+  return `${prefix}__tts`
+}
+
+function assetUrl(path: string): string {
+  const base = import.meta.env.BASE_URL || '/'
+  const prefix = base.endsWith('/') ? base : `${base}/`
+  return `${prefix}${path}`
+}
+
+function packedMpegUrl(spoken: string, voice: NeuralVoiceId): string {
+  return assetUrl(ttsAssetPath(voice, ttsAssetHash(voice, spoken)))
+}
+
+function getPlayer(): HTMLAudioElement {
+  if (!player) {
+    player = new Audio()
+    player.preload = 'auto'
+    player.setAttribute('playsinline', 'true')
+    player.setAttribute('webkit-playsinline', 'true')
+    player.setAttribute('aria-hidden', 'true')
+    if (typeof document !== 'undefined' && document.body) {
+      player.style.position = 'absolute'
+      player.style.width = '0'
+      player.style.height = '0'
+      player.style.opacity = '0'
+      player.style.pointerEvents = 'none'
+      document.body.appendChild(player)
+    }
+  }
+  return player
+}
+
+function releaseObjectUrl(): void {
+  if (objectUrl) {
+    globalThis.URL.revokeObjectURL(objectUrl)
+    objectUrl = null
+  }
+}
+
+function speechSynth(): SpeechSynthesis | null {
+  const root = typeof window !== 'undefined' ? window : globalThis
+  if (!root || !('speechSynthesis' in root)) return null
+  return (root as typeof globalThis & { speechSynthesis: SpeechSynthesis }).speechSynthesis
+}
+
+function cancelWebSpeech(): void {
+  if (resumeTimer != null) {
+    clearInterval(resumeTimer)
+    resumeTimer = null
+  }
+  const synth = speechSynth()
+  if (!synth) return
+  try {
+    synth.cancel()
+  } catch {
+    // Ignore.
+  }
+}
+
+function pauseAudioKeepingUnlock(): void {
+  if (!player) return
+  try {
+    player.pause()
+  } catch {
+    // Ignore DOM exceptions while pausing.
+  }
+}
+
+export function getTtsStatus(): TtsStatus {
+  const voice = currentVoice()
+  return {
+    available: engine !== 'unavailable',
+    label: formatLabel(voice, unlocked),
+    unlocked,
+    hint,
+    engine,
+    voiceId: voice.id,
+    voiceLabel: voice.label,
+  }
+}
+
+export function subscribeTts(listener: StatusListener): () => void {
+  listeners.add(listener)
+  listener(getTtsStatus())
+  return () => {
+    listeners.delete(listener)
+  }
+}
+
+export function setSelectedVoice(id: string): void {
+  const voice = voiceById(id)
+  voiceId = voice.id
+  persistVoiceId(voice.id)
+  if (engine === 'webspeech-fallback') engine = HAPPY_PATH_ENGINE
+  hint = null
+  emit()
+}
+
+export function initTts(): void {
+  if (!hasAudioElement()) {
+    engine = 'unavailable'
+    emit()
+    return
+  }
+  voiceId = readStoredVoiceId()
+  engine = HAPPY_PATH_ENGINE
+  hint = null
+  emit()
+  if (typeof window === 'undefined' || unlockBound) return
+  unlockBound = true
+  const unlock = () => unlockTts()
+  for (const name of UNLOCK_EVENTS) {
+    window.addEventListener(name, unlock, { passive: true, capture: true })
+  }
+}
+
+function primeAudioIfIdle(): void {
+  if (!hasAudioElement()) return
+  const audio = getPlayer()
+  const src = audio.currentSrc || audio.src
+  const playingPacked = Boolean(src) && !src.startsWith('data:') && !audio.paused
+  if (playingPacked) return
+  try {
+    audio.muted = false
+    audio.src = SILENT_WAV
+    void audio
+      .play()
+      .then(() => {
+        if ((audio.currentSrc || audio.src).startsWith('data:')) {
+          audio.pause()
+          audio.currentTime = 0
+        }
+      })
+      .catch(() => {
+        // speak() still runs from the same tap.
+      })
+  } catch {
+    // iOS may reject silent priming.
+  }
+}
+
+function primeWebSpeech(): void {
+  const synth = speechSynth()
+  if (!synth) return
+  try {
+    synth.cancel()
+    const warm = new SpeechSynthesisUtterance(' ')
+    warm.lang = TTS_LANG
+    warm.volume = 0
+    warm.rate = 1
+    warm.pitch = 1
+    synth.speak(warm)
+  } catch {
+    // Compact iOS voices still unlock on a later speak().
+  }
+}
+
+export function unlockTts(): void {
+  if (!hasAudioElement() && !speechSynth()) return
+  unlocked = true
+  primeAudioIfIdle()
+  primeWebSpeech()
+  emit()
+}
+
+export function stopTts(): void {
+  speakSeq += 1
+  neuralSeq = -1
+  if (graceTimer != null) {
+    clearTimeout(graceTimer)
+    graceTimer = null
+  }
+  pauseAudioKeepingUnlock()
+  releaseObjectUrl()
+  cancelWebSpeech()
+}
+
+async function fetchMpeg(url: string, init?: RequestInit): Promise<Blob | null> {
+  const response = await fetch(url, init)
+  if (!response.ok) return null
+  const buffer = await response.arrayBuffer()
+  if (!isMpegBuffer(buffer)) return null
+  return new Blob([buffer], { type: 'audio/mpeg' })
+}
+
+function playFromUrl(url: string): Promise<void> {
+  const audio = getPlayer()
+  releaseObjectUrl()
+  audio.src = url
+  audio.volume = TTS_VOLUME
+  return audio.play()
+}
+
+function playBlob(blob: Blob): Promise<void> {
+  const audio = getPlayer()
+  releaseObjectUrl()
+  objectUrl = globalThis.URL.createObjectURL(blob)
+  audio.src = objectUrl
+  audio.volume = TTS_VOLUME
+  return audio.play()
+}
+
+function watchWebSpeech(): void {
+  const synth = speechSynth()
+  if (!synth || resumeTimer != null) return
+  resumeTimer = setInterval(() => {
+    try {
+      synth.resume()
+    } catch {
+      // Ignore.
+    }
+  }, 4000)
+}
+
+function speakWebSpeechFallback(spoken: string): void {
+  const synth = speechSynth()
+  if (!synth) {
+    throw new Error('no-webspeech')
+  }
+  synth.cancel()
+  const utterance = new SpeechSynthesisUtterance(spoken)
+  utterance.lang = TTS_LANG
+  utterance.rate = TTS_RATE
+  utterance.pitch = TTS_PITCH
+  utterance.volume = TTS_VOLUME
+  synth.speak(utterance)
+  watchWebSpeech()
+}
+
+function startWebSpeechFallback(seq: number, spoken: string): void {
+  if (seq !== speakSeq || neuralSeq === seq) return
+  try {
+    speakWebSpeechFallback(spoken)
+    engine = 'webspeech-fallback'
+    hint = FALLBACK_HINT
+    emit()
+  } catch {
+    engine = 'unavailable'
+    hint = 'Não foi possível falar neste navegador.'
+    emit()
+  }
+}
+
+function markNeuralPlaying(seq: number): void {
+  if (seq !== speakSeq) return
+  neuralSeq = seq
+  if (graceTimer != null) {
+    clearTimeout(graceTimer)
+    graceTimer = null
+  }
+  cancelWebSpeech()
+  engine = HAPPY_PATH_ENGINE
+  hint = null
+  emit()
+}
+
+async function playNeural(spoken: string, voice: NeuralVoiceId, seq: number): Promise<void> {
+  const voices: NeuralVoiceId[] = voice === DEFAULT_VOICE_ID ? [DEFAULT_VOICE_ID, FALLBACK_VOICE_ID] : [voice, DEFAULT_VOICE_ID]
+  for (const candidate of voices) {
+    if (seq !== speakSeq) return
+    try {
+      await playFromUrl(packedMpegUrl(spoken, candidate))
+      markNeuralPlaying(seq)
+      return
+    } catch {
+      // Packed file missing, blocked, or still buffering past play().
+    }
+  }
+  if (seq !== speakSeq) return
+
+  if (import.meta.env.DEV) {
+    for (const candidate of voices) {
+      try {
+        const live = await fetchMpeg(liveTtsUrl(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: spoken, voice: candidate }),
+        })
+        if (live && seq === speakSeq) {
+          await playBlob(live)
+          markNeuralPlaying(seq)
+          return
+        }
+      } catch {
+        // Try next voice.
+      }
+    }
+  }
+
+  if (seq !== speakSeq) return
+  if (graceTimer != null) {
+    clearTimeout(graceTimer)
+    graceTimer = null
+  }
+  startWebSpeechFallback(seq, spoken)
+}
+
+export function speak(text: string, _kind: SpeakKind = 'native'): void {
+  if (!text.trim() || engine === 'unavailable') return
+  const spoken = toSpokenText(text)
+  if (!spoken) return
+  unlocked = true
+  const voice = currentVoice().id
+  const seq = ++speakSeq
+  if (graceTimer != null) {
+    clearTimeout(graceTimer)
+    graceTimer = null
+  }
+  pauseAudioKeepingUnlock()
+  cancelWebSpeech()
+  speakSeq = seq
+  neuralSeq = -1
+
+  graceTimer = setTimeout(() => {
+    startWebSpeechFallback(seq, spoken)
+  }, MPEG_GRACE_MS)
+
+  void playNeural(spoken, voice, seq)
+}
+
+export function isStandaloneDisplay(): boolean {
+  if (typeof window === 'undefined') return false
+  const media = window.matchMedia('(display-mode: standalone)').matches
+  const ios = 'standalone' in navigator && Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
+  return media || ios
+}
+
+/** Test helper: never true on the iPhone happy path. */
+export function happyPathUsesSpeechSynthesis(): boolean {
+  return false
+}

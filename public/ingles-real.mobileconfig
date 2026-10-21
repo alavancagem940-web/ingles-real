@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>PayloadContent</key>
+  <array>
+    <dict>
+      <key>FullScreen</key>
+      <true/>
+      <key>Icon</key>
+      <data>
+iVBORw0KGgoAAAANSUhEUgAAALQAAAC0CAYAAAA9zQYyAAADcElEQVR42u3dsU3FQBBF0Z+TklMD
+KXXQBv1REl1ABSCQPt6Z905wQwfeOYFlW7u3h6eXTymlm0UQ0BLQEtAS0AJaAloCWgJaAlpAS0BL
+QEtAL+rx+fXHrBHQa7DeK2sN9Fq8kANdgxhuoCMBAw50BWSwi0GnIoa7DHQb5FbYN5DBBhpksIEG
+GWygYYa6DzSUYEeAhhDsGNDgQR0DGjioI0BDBnYMaLCgjgENFNQxoEGCOgY0QFDHgAYH6hjQwEAd
+AxoUqGNAAwJ1DGgwoI4BDQTUMaBBgDoGNABQx4A2eKiBFtATQRs41DGgDRrqGNAGDDXQAnoiaIOF
+GujFfby//RjQi0G3Yb1XUA8EDS/kV6IGejjgNOCrQUMM99Woq0GnQN4GeyVokME+gboKdAvkDbBX
+gQYZ7FOoo0FDPBv2CtAgg30SdRxoUHehBhrmKNSjQcMM9WnU60HDuB/2SNAwQz0B9VrQ4GWhBho6
+oFNAA5eHehRomKGegnoVaMCyUQMtoO8NGmaoJ6EGWkBfDRqoHtRAC2igBXQh5u/ue8v1jaiB/iOm
+36I6fT3QQAMNdCbo39z7adCnUAMNNNBAe+TwyAE00EAD7bUd0D6q+LiSB9pPSUBPRA20gAYaaKCh
+hhlooIEGWkDbWEYZG88ALaChhtmXQqhhBhpooMNBQ52/q38daKgdUREHGmonY8WBhtrZhXGgoXbC
+bBxoqLPOAa/YfRRqmOtAg70XMtBQx2EGGuwYyEBDHYd5BOgtqJthb5lP5TmFYOdBBhruGMQjQW9H
+vR13wtrXH17fjjplvYEuBZ0GGOgS0Olw14BOQA3lbsxAAw20V3hQT8UM9D8+O8MKtICeBxpqncIM
+tICGWlMxAy2godZUzEALaKg1FTPQAhpqTcV8GWiodZUzoAU01JqIGWgBDbWmYj4CGmqY40BDDTPQ
+AnoyaKhhjgMNNcxxoKGGOQ401DDHgYYa5jjQUMMcBxpqmONAQw1zHGioYY4DDTXMcaChhjkONNQw
+x4GGGuY40GCDHAkaapjjQEMNcxxosEGOBA02yJGgoe7GHAka7E7I8aDB7oJcAxrsDsh1oFtht823
+DnQD7uaZVoNOg22WQK8GblZAr8dtJkCvRW6tgV6D3hoBLQEtoCWgJaAloCWgBbQEtAS0BLQEtICW
+gJbO9AVbp4U3Ld+GMAAAAABJRU5ErkJggg==
+      </data>
+      <key>IsRemovable</key>
+      <true/>
+      <key>Label</key>
+      <string>Inglês Real</string>
+      <key>PayloadDescription</key>
+      <string>Atalho do Inglês Real na Tela de Início</string>
+      <key>PayloadDisplayName</key>
+      <string>Inglês Real</string>
+      <key>PayloadIdentifier</key>
+      <string>web.inglesreal.webclip</string>
+      <key>PayloadType</key>
+      <string>com.apple.webClip.managed</string>
+      <key>PayloadUUID</key>
+      <string>B7E21C4A-3D90-4F11-9C2E-6A8F1D4B9E20</string>
+      <key>PayloadVersion</key>
+      <integer>1</integer>
+      <key>Precomposed</key>
+      <true/>
+      <key>URL</key>
+      <string>https://alavancagem940-web.github.io/ingles-real/</string>
+    </dict>
+  </array>
+  <key>PayloadDescription</key>
+  <string>Coloca o Inglês Real na Tela de Início como um aplicativo.</string>
+  <key>PayloadDisplayName</key>
+  <string>Inglês Real</string>
+  <key>PayloadIdentifier</key>
+  <string>web.inglesreal</string>
+  <key>PayloadOrganization</key>
+  <string>Inglês Real</string>
+  <key>PayloadRemovalDisallowed</key>
+  <false/>
+  <key>PayloadType</key>
+  <string>Configuration</string>
+  <key>PayloadUUID</key>
+  <string>C0A19E55-8B44-4A77-A1D2-3F6C8E0B1724</string>
+  <key>PayloadVersion</key>
+  <integer>1</integer>
+</dict>
+</plist>

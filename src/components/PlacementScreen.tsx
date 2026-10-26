@@ -14,7 +14,7 @@ import { shuffledChoices } from '../lib/shuffle'
 import { speak, unlockTts } from '../lib/tts'
 import { Button } from './ui/button'
 import { ExplainListenButton } from './ExplainListenButton'
-import { GlossaryNote } from './GlossaryNote'
+import { GlossaryText } from './GlossaryNote'
 import { NativeListenButton } from './NativeListenButton'
 import { PhraseBlock } from './PhraseBlock'
 import { Progress } from './ui/progress'
@@ -139,8 +139,9 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
         <p className="text-xs font-bold text-muted">
           Bloco {labelDifficulty(difficulty)} · pergunta {index + 1} de {round.length}
         </p>
-        <h2 className="mt-2 text-lg font-extrabold leading-snug text-white">{question.prompt}</h2>
-        <GlossaryNote text={question.prompt} seen={seenTerms} onSeen={onSeenTerm} />
+        <h2 className="mt-2 text-lg font-extrabold leading-snug text-white">
+          <GlossaryText text={question.prompt} seen={seenTerms} onSeen={onSeenTerm} />
+        </h2>
         {question.choicesAreEnglish ||
         question.nativePhrase.trim() === question.answer.trim() ||
         question.choices.some((choice) => choice.trim() === question.nativePhrase.trim()) ? (

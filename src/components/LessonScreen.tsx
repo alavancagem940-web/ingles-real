@@ -15,7 +15,7 @@ import { shuffledChoices } from '../lib/shuffle'
 import { Button } from './ui/button'
 import { Progress } from './ui/progress'
 import { ExplainListenButton } from './ExplainListenButton'
-import { GlossaryNote } from './GlossaryNote'
+import { GlossaryText } from './GlossaryNote'
 import { NativeListenButton } from './NativeListenButton'
 import { PhraseBlock } from './PhraseBlock'
 import { TheoryCard } from './TheoryCard'
@@ -233,9 +233,8 @@ function ExercisePanel({
           Pergunta {index + 1} de {total}
         </p>
         <h1 className="mt-2 whitespace-pre-wrap text-[1.35rem] font-extrabold leading-snug text-white">
-          {exercise.prompt}
+          <GlossaryText text={exercise.prompt} seen={seenTerms} onSeen={onSeenTerm} />
         </h1>
-        <GlossaryNote text={exercise.prompt} seen={seenTerms} onSeen={onSeenTerm} />
         {exercise.type !== 'multiple_choice' || showsPhraseBeforeAnswer(exercise) || checked ? (
           <div className="mt-3">
             <PhraseBlock english={exercise.nativePhrase} />
@@ -281,7 +280,13 @@ function ExercisePanel({
 
         {exercise.type === 'fill_blank' ? (
           <div className="mt-5">
-            <p className="text-xs text-muted">Digite a peça em inglês (redução, gíria ou phrasal).</p>
+            <p className="text-xs text-muted">
+              <GlossaryText
+                text="Digite a peça em inglês (redução, gíria ou phrasal)."
+                seen={seenTerms}
+                onSeen={onSeenTerm}
+              />
+            </p>
             <input
               ref={fillRef}
               value={fillValue}

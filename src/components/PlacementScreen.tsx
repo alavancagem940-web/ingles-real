@@ -10,8 +10,11 @@ import {
   type PlacementDifficulty,
   type PlacementQuestion,
 } from '../lib/placement'
+import { shuffledChoices } from '../lib/shuffle'
 import { speak, unlockTts } from '../lib/tts'
 import { Button } from './ui/button'
+import { ExplainListenButton } from './ExplainListenButton'
+import { GlossaryNote } from './GlossaryNote'
 import { NativeListenButton } from './NativeListenButton'
 import { PhraseBlock } from './PhraseBlock'
 import { Progress } from './ui/progress'
@@ -19,11 +22,13 @@ import { cn } from '../lib/cn'
 
 type PlacementScreenProps = {
   retake: boolean
+  seenTerms: readonly string[]
+  onSeenTerm: (id: string) => void
   onFinished: (band: PlacementBand) => void
   onCancel?: () => void
 }
 
-export function PlacementScreen({ retake, onFinished, onCancel }: PlacementScreenProps) {
+export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onCancel }: PlacementScreenProps) {
   const [difficulty, setDifficulty] = useState<PlacementDifficulty>('easy')
   const [index, setIndex] = useState(0)
   const correctRef = useRef(0)
@@ -31,12 +36,21 @@ export function PlacementScreen({ retake, onFinished, onCancel }: PlacementScree
   const [checked, setChecked] = useState(false)
   const [lastCorrect, setLastCorrect] = useState<boolean | null>(null)
   const [result, setResult] = useState<PlacementBand | null>(null)
+  const [choices, setChoices] = useState<string[]>([])
 
   const round = questionsForRound(difficulty)
   const question = round[index]
 
   useEffect(() => {
-    if (question && !result) speak(question.nativePhrase, 'native')
+    if (!question) return
+    setChoices(shuffledChoices(question.choices))
+  }, [question])
+
+  useEffect(() => {
+    if (!question || result || question.choicesAreEnglish) return
+    if (question.nativePhrase.trim() === question.answer.trim()) return
+    if (question.choices.some((choice) => choice.trim() === question.nativePhrase.trim())) return
+    speak(question.nativePhrase, 'native')
   }, [question, result])
 
   if (result) {
@@ -88,7 +102,7 @@ export function PlacementScreen({ retake, onFinished, onCancel }: PlacementScree
     setChecked(true)
     setLastCorrect(ok)
     correctRef.current += ok ? 1 : 0
-    speak(question.nativePhrase, 'native')
+    speak(ok ? question.explainCorrect : question.explainWrong, 'explain')
   }
 
   function advance() {
@@ -126,11 +140,22 @@ export function PlacementScreen({ retake, onFinished, onCancel }: PlacementScree
           Bloco {labelDifficulty(difficulty)} · pergunta {index + 1} de {round.length}
         </p>
         <h2 className="mt-2 text-lg font-extrabold leading-snug text-white">{question.prompt}</h2>
-        <div className="mt-3">
-          <PhraseBlock english={question.nativePhrase} />
-        </div>
+        <GlossaryNote text={question.prompt} seen={seenTerms} onSeen={onSeenTerm} />
+        {question.choicesAreEnglish ||
+        question.nativePhrase.trim() === question.answer.trim() ||
+        question.choices.some((choice) => choice.trim() === question.nativePhrase.trim()) ? (
+          checked ? (
+            <div className="mt-3">
+              <PhraseBlock english={question.nativePhrase} />
+            </div>
+          ) : null
+        ) : (
+          <div className="mt-3">
+            <PhraseBlock english={question.nativePhrase} />
+          </div>
+        )}
         <ul className="mt-4 flex flex-col gap-3">
-          {question.choices.map((choice) => (
+          {choices.map((choice) => (
             <ChoiceRow
               key={choice}
               question={question}
@@ -157,6 +182,9 @@ export function PlacementScreen({ retake, onFinished, onCancel }: PlacementScree
             <p className="mt-1 text-sm leading-relaxed text-white/90">
               {lastCorrect ? question.explainCorrect : question.explainWrong}
             </p>
+            <div className="mt-2">
+              <ExplainListenButton text={lastCorrect ? question.explainCorrect : question.explainWrong} />
+            </div>
             <Button className="mt-3 w-full" onClick={advance}>
               Continuar
             </Button>
@@ -191,7 +219,7 @@ function ChoiceRow({
         disabled={checked}
         onClick={() => {
           onSelect(choice)
-          if (question.choicesAreEnglish) speak(choice, 'choice')
+          if (question.choicesAreEnglish) speak(choice, 'native')
         }}
         className={cn(
           'w-full rounded-2xl border-2 px-4 py-3.5 text-left text-[0.95rem] font-bold leading-snug text-white touch-manipulation',

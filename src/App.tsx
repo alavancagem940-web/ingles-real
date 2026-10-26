@@ -9,7 +9,7 @@ import { PlacementScreen } from './components/PlacementScreen'
 import {
   challengePassThreshold,
   levelForUnit,
-  spokenTheory,
+  spokenExplanation,
   unitById,
   validateCurriculum,
 } from './lib/lessons'
@@ -118,7 +118,7 @@ export default function App() {
       store.savePosition({ unitId, phase: 'theory', index: 0, correctCount: 0 })
     }
     setScreen({ name: 'lesson', unitId })
-    speak(spokenTheory(unit), 'theory')
+    speak(spokenExplanation(unit), 'explain')
   }
 
   function finishUnit(unitId: string, correctCount: number) {
@@ -166,6 +166,8 @@ export default function App() {
         {screen.name === 'placement' ? (
           <PlacementScreen
             retake={screen.retake}
+            seenTerms={store.seenTerms}
+            onSeenTerm={(id) => store.noteTerm(id)}
             onFinished={finishPlacement}
             onCancel={screen.retake ? goHome : undefined}
           />

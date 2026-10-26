@@ -24,6 +24,11 @@ export type LessonPosition = {
   correctCount: number
 }
 
+export type PlacementRecord = {
+  band: PlacementBand
+  at: string
+}
+
 export type ProgressSnapshot = {
   xp: number
   completedUnits: string[]
@@ -32,6 +37,8 @@ export type ProgressSnapshot = {
   placementBand: PlacementBand | null
   answers: Record<string, SavedAnswer>
   position: LessonPosition | null
+  seenTerms: string[]
+  placementHistory: PlacementRecord[]
 }
 
 export class ProgressError extends Error {
@@ -49,6 +56,8 @@ const emptySnapshot = (): ProgressSnapshot => ({
   placementBand: null,
   answers: {},
   position: null,
+  seenTerms: [],
+  placementHistory: [],
 })
 
 function memoryStorage(): StorageLike {
@@ -84,6 +93,8 @@ export class ProgressStore {
   placementBand: PlacementBand | null = null
   answers: Record<string, SavedAnswer> = {}
   position: LessonPosition | null = null
+  seenTerms: string[] = []
+  placementHistory: PlacementRecord[] = []
   private storage: StorageLike
   private key: string
 
@@ -115,6 +126,8 @@ export class ProgressStore {
       this.placementBand = parseBand(data.placementBand)
       this.answers = parseAnswers(data.answers)
       this.position = parsePosition(data.position)
+      this.seenTerms = Array.isArray(data.seenTerms) ? data.seenTerms.map(String) : []
+      this.placementHistory = parsePlacementHistory(data.placementHistory)
     } catch (error) {
       throw new ProgressError(
         `Não foi possível ler o progresso salvo: ${error instanceof Error ? error.message : String(error)}`,
@@ -142,6 +155,8 @@ export class ProgressStore {
     this.placementBand = null
     this.answers = {}
     this.position = null
+    this.seenTerms = []
+    this.placementHistory = []
     this.save()
   }
 
@@ -154,6 +169,8 @@ export class ProgressStore {
       placementBand: this.placementBand,
       answers: { ...this.answers },
       position: this.position ? { ...this.position } : null,
+      seenTerms: [...this.seenTerms],
+      placementHistory: this.placementHistory.map((row) => ({ ...row })),
     }
   }
 
@@ -163,14 +180,23 @@ export class ProgressStore {
   }
 
   completePlacement(band: PlacementBand): void {
-    this.placementCompleted = true
-    this.placementBand = band
-    this.save()
+    this.rememberPlacement(band)
   }
 
   retakePlacement(band: PlacementBand): void {
+    this.rememberPlacement(band)
+  }
+
+  noteTerm(id: string): void {
+    if (!id || this.seenTerms.includes(id)) return
+    this.seenTerms.push(id)
+    this.save()
+  }
+
+  private rememberPlacement(band: PlacementBand): void {
     this.placementCompleted = true
     this.placementBand = band
+    this.placementHistory.push({ band, at: new Date().toISOString() })
     this.save()
   }
 
@@ -251,6 +277,19 @@ export class ProgressStore {
 function parseBand(value: unknown): PlacementBand | null {
   if (value === 'iniciante' || value === 'intermediario' || value === 'avancado') return value
   return null
+}
+
+function parsePlacementHistory(value: unknown): PlacementRecord[] {
+  if (!Array.isArray(value)) return []
+  const rows: PlacementRecord[] = []
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue
+    const row = entry as Record<string, unknown>
+    const band = parseBand(row.band)
+    if (!band) continue
+    rows.push({ band, at: String(row.at ?? '') })
+  }
+  return rows
 }
 
 function parseAnswers(value: unknown): Record<string, SavedAnswer> {

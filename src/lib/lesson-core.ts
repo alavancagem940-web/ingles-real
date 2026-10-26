@@ -67,6 +67,22 @@ export function spokenNative(exercise: Exercise): string {
   return exercise.nativePhrase
 }
 
+/** Portuguese rule text. Francisca reads this. Jenny does not. */
+export function spokenExplanation(unit: Unit): string {
+  return [unit.theory.concept, unit.theory.culture].filter((part) => part.trim()).join(' ')
+}
+
+/** The top phrase card spoils a multiple-choice item when it is the answer itself. */
+export function showsPhraseBeforeAnswer(exercise: Exercise): boolean {
+  if (exercise.type !== 'multiple_choice') return true
+  if (exercise.choicesAreEnglish) return false
+  const phrase = exercise.nativePhrase.trim()
+  if (!phrase) return false
+  if (phrase === String(exercise.answer).trim()) return false
+  if (exercise.choices.some((choice) => choice.trim() === phrase)) return false
+  return true
+}
+
 /** Visible English on the theory card, in card order — what Jenny reads. */
 export function spokenTheory(unit: Unit): string {
   const parts: string[] = []

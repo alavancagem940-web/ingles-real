@@ -1,7 +1,8 @@
 import { ChevronLeft } from 'lucide-react'
-import { THEORY_CARD_TITLE, spokenTheory, type Unit } from '../lib/lessons'
+import { THEORY_CARD_TITLE, spokenExplanation, spokenTheory, type Unit } from '../lib/lessons'
 import { unlockTts } from '../lib/tts'
 import { Button } from './ui/button'
+import { ExplainListenButton } from './ExplainListenButton'
 import { NativeListenButton } from './NativeListenButton'
 import { PhraseBlock } from './PhraseBlock'
 
@@ -28,8 +29,11 @@ export function TheoryCard({ unit, onContinue, onExit }: TheoryCardProps) {
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-4 pb-36">
         <div className="mb-3 flex flex-col gap-2">
-          <p className="text-xs font-bold text-muted">Leia a regra e ouça cada frase em inglês</p>
-          <NativeListenButton phrase={allEnglish} />
+          <p className="text-xs font-bold text-muted">Leia a regra em português e ouça cada frase em inglês</p>
+          <div className="flex flex-wrap gap-2">
+            <ExplainListenButton text={spokenExplanation(unit)} />
+            <NativeListenButton phrase={allEnglish} />
+          </div>
         </div>
 
         <section className="rounded-3xl border-2 border-gold bg-card px-4 py-4 shadow-[0_6px_0_0_rgba(0,0,0,0.28)]">

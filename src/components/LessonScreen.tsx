@@ -3,15 +3,19 @@ import { ChevronLeft } from 'lucide-react'
 import {
   THEORY_CARD_TITLE,
   checkAnswer,
+  showsPhraseBeforeAnswer,
+  spokenExplanation,
   spokenNative,
-  spokenTheory,
   type Exercise,
   type Unit,
 } from '../lib/lessons'
 import { XP_PER_CORRECT, type LessonPhase, type ProgressStore } from '../lib/progress'
 import { speak, stopTts, unlockTts } from '../lib/tts'
+import { shuffledChoices } from '../lib/shuffle'
 import { Button } from './ui/button'
 import { Progress } from './ui/progress'
+import { ExplainListenButton } from './ExplainListenButton'
+import { GlossaryNote } from './GlossaryNote'
 import { NativeListenButton } from './NativeListenButton'
 import { PhraseBlock } from './PhraseBlock'
 import { TheoryCard } from './TheoryCard'
@@ -56,7 +60,7 @@ export function LessonScreen({ unit, store, onXp, onExit, onFinished }: LessonSc
         onContinue={() => {
           setPhase('quiz')
           const first = unit.exercises[0]
-          if (first) speak(spokenNative(first), 'native')
+          if (first && showsPhraseBeforeAnswer(first)) speak(spokenNative(first), 'native')
         }}
       />
     )
@@ -93,7 +97,7 @@ export function LessonScreen({ unit, store, onXp, onExit, onFinished }: LessonSc
           className="mt-2 text-left text-xs font-extrabold text-gold underline decoration-gold/40 underline-offset-4"
           onClick={() => {
             setPhase('theory')
-            speak(spokenTheory(unit), 'theory')
+            speak(spokenExplanation(unit), 'explain')
           }}
         >
           Ver {THEORY_CARD_TITLE}
@@ -118,6 +122,8 @@ export function LessonScreen({ unit, store, onXp, onExit, onFinished }: LessonSc
         onRetry={() => {
           setCheckedCorrect(false)
         }}
+        seenTerms={store.seenTerms}
+        onSeenTerm={(id) => store.noteTerm(id)}
         onAdvance={() => {
           const next = index + 1
           if (next >= total) {
@@ -127,7 +133,7 @@ export function LessonScreen({ unit, store, onXp, onExit, onFinished }: LessonSc
           setCheckedCorrect(false)
           setIndex(next)
           const upcoming = unit.exercises[next]
-          if (upcoming) speak(spokenNative(upcoming), 'native')
+          if (upcoming && showsPhraseBeforeAnswer(upcoming)) speak(spokenNative(upcoming), 'native')
         }}
       />
     </div>
@@ -142,6 +148,8 @@ type ExercisePanelProps = {
   onIncorrect: (submission: string | string[]) => void
   onRetry: () => void
   onAdvance: () => void
+  seenTerms: readonly string[]
+  onSeenTerm: (id: string) => void
 }
 
 function ExercisePanel({
@@ -152,11 +160,16 @@ function ExercisePanel({
   onIncorrect,
   onRetry,
   onAdvance,
+  seenTerms,
+  onSeenTerm,
 }: ExercisePanelProps) {
   const [selected, setSelected] = useState<string | null>(null)
   const [fillValue, setFillValue] = useState('')
   const [orderBuilt, setOrderBuilt] = useState<string[]>([])
   const [pool, setPool] = useState(() => shuffleLines(exercise))
+  const [choices, setChoices] = useState(() =>
+    exercise.type === 'multiple_choice' ? shuffledChoices(exercise.choices) : exercise.choices,
+  )
   const [checked, setChecked] = useState(false)
   const [lastCorrect, setLastCorrect] = useState<boolean | null>(null)
   const [message, setMessage] = useState('')
@@ -179,6 +192,7 @@ function ExercisePanel({
     setMessage('')
     setHint('')
     onRetry()
+    if (exercise.type === 'multiple_choice') setChoices(shuffledChoices(exercise.choices))
     window.setTimeout(() => fillRef.current?.focus(), 40)
   }
 
@@ -207,7 +221,7 @@ function ExercisePanel({
     setChecked(true)
     setLastCorrect(result.correct)
     setMessage(result.message)
-    speak(spokenNative(exercise), 'native')
+    speak(result.correct ? exercise.explainCorrect : exercise.explainWrong, 'explain')
     if (result.correct) onCorrect(submission)
     else onIncorrect(submission)
   }
@@ -221,13 +235,16 @@ function ExercisePanel({
         <h1 className="mt-2 whitespace-pre-wrap text-[1.35rem] font-extrabold leading-snug text-white">
           {exercise.prompt}
         </h1>
-        <div className="mt-3">
-          <PhraseBlock english={exercise.nativePhrase} />
-        </div>
+        <GlossaryNote text={exercise.prompt} seen={seenTerms} onSeen={onSeenTerm} />
+        {exercise.type !== 'multiple_choice' || showsPhraseBeforeAnswer(exercise) || checked ? (
+          <div className="mt-3">
+            <PhraseBlock english={exercise.nativePhrase} />
+          </div>
+        ) : null}
 
         {exercise.type === 'multiple_choice' ? (
           <ul className="mt-5 flex flex-col gap-3">
-            {exercise.choices.map((choice) => {
+            {choices.map((choice) => {
               const isSelected = selected === choice
               const showGreen = checked && lastCorrect && choice === exercise.answer
               const showRed = checked && lastCorrect === false && choice === selected
@@ -238,7 +255,7 @@ function ExercisePanel({
                     disabled={checked}
                     onClick={() => {
                       setSelected(choice)
-                      if (exercise.choicesAreEnglish) speak(choice, 'choice')
+                      if (exercise.choicesAreEnglish) speak(choice, 'native')
                     }}
                     className={cn(
                       'w-full rounded-2xl border-2 px-4 py-3.5 text-left text-[0.95rem] font-bold leading-snug text-white transition-colors touch-manipulation',
@@ -357,6 +374,9 @@ function ExercisePanel({
               Por que está certo
             </p>
             <p className="mt-1 text-sm leading-relaxed text-white/90">{message}</p>
+            <div className="mt-2">
+              <ExplainListenButton text={message} />
+            </div>
             <Button className="mt-3 w-full" onClick={onAdvance}>
               Continuar
             </Button>
@@ -368,6 +388,9 @@ function ExercisePanel({
               O motivo correto
             </p>
             <p className="mt-1 text-sm leading-relaxed text-white/90">{message}</p>
+            <div className="mt-2">
+              <ExplainListenButton text={message} />
+            </div>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Button variant="outline" className="border-red text-red" onClick={retryInPlace}>
                 Tentar de novo

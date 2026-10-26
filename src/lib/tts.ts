@@ -1,12 +1,15 @@
 import { type SpeakKind, toSpokenText } from './speech-persona'
 import {
   DEFAULT_VOICE_ID,
+  EXPLAIN_LANG,
+  EXPLAIN_VOICE_ID,
   FALLBACK_VOICE_ID,
   HAPPY_PATH_ENGINE,
   TTS_LANG,
   TTS_PITCH,
   TTS_RATE,
   TTS_VOLUME,
+  type ClipVoiceId,
   type NeuralVoice,
   type NeuralVoiceId,
   isMpegBuffer,
@@ -74,6 +77,20 @@ let neuralSeq = -1
 let graceTimer: ReturnType<typeof setTimeout> | null = null
 let resumeTimer: ReturnType<typeof setInterval> | null = null
 let unlockBound = false
+let audioPrimed = false
+
+function voiceForKind(kind: SpeakKind): ClipVoiceId {
+  if (kind === 'native' || kind === 'choice') return DEFAULT_VOICE_ID
+  return EXPLAIN_VOICE_ID
+}
+
+function fallbackLang(voice: ClipVoiceId): string {
+  return voice === EXPLAIN_VOICE_ID ? EXPLAIN_LANG : TTS_LANG
+}
+
+function fallbackRate(voice: ClipVoiceId): number {
+  return voice === EXPLAIN_VOICE_ID ? 0.92 : TTS_RATE
+}
 
 function hasAudioElement(): boolean {
   return typeof Audio !== 'undefined'
@@ -107,7 +124,7 @@ function assetUrl(path: string): string {
   return `${prefix}${path}`
 }
 
-function packedMpegUrl(spoken: string, voice: NeuralVoiceId): string {
+function packedMpegUrl(spoken: string, voice: ClipVoiceId): string {
   return assetUrl(ttsAssetPath(voice, ttsAssetHash(voice, spoken)))
 }
 
@@ -119,15 +136,39 @@ function getPlayer(): HTMLAudioElement {
     player.setAttribute('webkit-playsinline', 'true')
     player.setAttribute('aria-hidden', 'true')
     if (typeof document !== 'undefined' && document.body) {
-      player.style.position = 'absolute'
-      player.style.width = '0'
-      player.style.height = '0'
-      player.style.opacity = '0'
-      player.style.pointerEvents = 'none'
-      document.body.appendChild(player)
+    player.style.position = 'fixed'
+    player.style.left = '0'
+    player.style.top = '0'
+    player.style.width = '1px'
+    player.style.height = '1px'
+    player.style.opacity = '0.02'
+    player.style.pointerEvents = 'none'
+    document.body.appendChild(player)
+    routePastScrollDuck(player)
     }
   }
   return player
+}
+
+function routePastScrollDuck(audio: HTMLAudioElement): void {
+  if (typeof audio.canPlayType !== 'function') return
+  const marked = audio as HTMLAudioElement & { __graph?: boolean }
+  if (marked.__graph) return
+  const root = window as Window & { webkitAudioContext?: typeof AudioContext }
+  const Ctx = window.AudioContext ?? root.webkitAudioContext
+  if (!Ctx) return
+  try {
+    const ctx = new Ctx()
+    const source = ctx.createMediaElementSource(audio)
+    const gain = ctx.createGain()
+    gain.gain.value = 1
+    source.connect(gain)
+    gain.connect(ctx.destination)
+    marked.__graph = true
+    void ctx.resume()
+  } catch {
+    // A second graph on the same element throws. Playback still uses the element.
+  }
 }
 
 function releaseObjectUrl(): void {
@@ -258,8 +299,11 @@ function primeWebSpeech(): void {
 export function unlockTts(): void {
   if (!hasAudioElement() && !speechSynth()) return
   unlocked = true
-  primeAudioIfIdle()
-  primeWebSpeech()
+  if (!audioPrimed) {
+    audioPrimed = true
+    primeAudioIfIdle()
+    primeWebSpeech()
+  }
   emit()
 }
 
@@ -285,7 +329,13 @@ async function fetchMpeg(url: string, init?: RequestInit): Promise<Blob | null> 
 
 function playFromUrl(url: string): Promise<void> {
   const audio = getPlayer()
+  try {
+    audio.pause()
+  } catch {
+    // The previous clip is already stopped.
+  }
   releaseObjectUrl()
+  audio.muted = false
   audio.src = url
   audio.volume = TTS_VOLUME
   return audio.play()
@@ -293,8 +343,14 @@ function playFromUrl(url: string): Promise<void> {
 
 function playBlob(blob: Blob): Promise<void> {
   const audio = getPlayer()
+  try {
+    audio.pause()
+  } catch {
+    // The previous clip is already stopped.
+  }
   releaseObjectUrl()
   objectUrl = globalThis.URL.createObjectURL(blob)
+  audio.muted = false
   audio.src = objectUrl
   audio.volume = TTS_VOLUME
   return audio.play()
@@ -312,25 +368,25 @@ function watchWebSpeech(): void {
   }, 4000)
 }
 
-function speakWebSpeechFallback(spoken: string): void {
+function speakWebSpeechFallback(spoken: string, voice: ClipVoiceId): void {
   const synth = speechSynth()
   if (!synth) {
     throw new Error('no-webspeech')
   }
   synth.cancel()
   const utterance = new SpeechSynthesisUtterance(spoken)
-  utterance.lang = TTS_LANG
-  utterance.rate = TTS_RATE
-  utterance.pitch = TTS_PITCH
+  utterance.lang = fallbackLang(voice)
+  utterance.rate = fallbackRate(voice)
+  utterance.pitch = voice === EXPLAIN_VOICE_ID ? 1 : TTS_PITCH
   utterance.volume = TTS_VOLUME
   synth.speak(utterance)
   watchWebSpeech()
 }
 
-function startWebSpeechFallback(seq: number, spoken: string): void {
+function startWebSpeechFallback(seq: number, spoken: string, voice: ClipVoiceId): void {
   if (seq !== speakSeq || neuralSeq === seq) return
   try {
-    speakWebSpeechFallback(spoken)
+    speakWebSpeechFallback(spoken, voice)
     engine = 'webspeech-fallback'
     hint = FALLBACK_HINT
     emit()
@@ -354,8 +410,9 @@ function markNeuralPlaying(seq: number): void {
   emit()
 }
 
-async function playNeural(spoken: string, voice: NeuralVoiceId, seq: number): Promise<void> {
-  const voices: NeuralVoiceId[] = voice === DEFAULT_VOICE_ID ? [DEFAULT_VOICE_ID, FALLBACK_VOICE_ID] : [voice, DEFAULT_VOICE_ID]
+async function playNeural(spoken: string, voice: ClipVoiceId, seq: number): Promise<void> {
+  const voices: ClipVoiceId[] =
+    voice === EXPLAIN_VOICE_ID ? [EXPLAIN_VOICE_ID] : [DEFAULT_VOICE_ID, FALLBACK_VOICE_ID]
   for (const candidate of voices) {
     if (seq !== speakSeq) return
     try {
@@ -392,15 +449,15 @@ async function playNeural(spoken: string, voice: NeuralVoiceId, seq: number): Pr
     clearTimeout(graceTimer)
     graceTimer = null
   }
-  startWebSpeechFallback(seq, spoken)
+  startWebSpeechFallback(seq, spoken, voice)
 }
 
-export function speak(text: string, _kind: SpeakKind = 'native'): void {
+export function speak(text: string, kind: SpeakKind = 'native'): void {
   if (!text.trim() || engine === 'unavailable') return
   const spoken = toSpokenText(text)
   if (!spoken) return
   unlocked = true
-  const voice = currentVoice().id
+  const voice = voiceForKind(kind)
   const seq = ++speakSeq
   if (graceTimer != null) {
     clearTimeout(graceTimer)
@@ -412,7 +469,7 @@ export function speak(text: string, _kind: SpeakKind = 'native'): void {
   neuralSeq = -1
 
   graceTimer = setTimeout(() => {
-    startWebSpeechFallback(seq, spoken)
+    startWebSpeechFallback(seq, spoken, voice)
   }, MPEG_GRACE_MS)
 
   void playNeural(spoken, voice, seq)

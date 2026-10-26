@@ -52,6 +52,9 @@ describe('progresso localStorage', () => {
     const payload = JSON.parse(storage.getItem(STORAGE_KEY) ?? '{}') as Record<string, unknown>
     expect(payload.xp).toBe(80)
     expect(payload.placementBand).toBe('avancado')
+    expect(Array.isArray(payload.placementHistory)).toBe(true)
+    expect((payload.placementHistory as unknown[]).length).toBeGreaterThan(0)
+    expect(payload).toHaveProperty('seenTerms')
     expect(payload).toHaveProperty('answers')
     expect(payload).toHaveProperty('position')
     expect(payload).not.toHaveProperty('hearts')

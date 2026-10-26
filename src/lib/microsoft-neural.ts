@@ -28,6 +28,12 @@ export type NeuralVoice = {
 /** Default: Jenny. US English neural, clear, slightly slow. Ana is fallback. */
 export const DEFAULT_VOICE_ID: NeuralVoiceId = 'en-US-JennyNeural'
 export const FALLBACK_VOICE_ID: NeuralVoiceId = 'en-US-AnaNeural'
+/** Explanations stay in Brazilian Portuguese. Not part of the English voice picker. */
+export const EXPLAIN_VOICE_ID = 'pt-BR-FranciscaNeural' as const
+export type ClipVoiceId = NeuralVoiceId | typeof EXPLAIN_VOICE_ID
+export const EXPLAIN_LANG = 'pt-BR'
+export const EXPLAIN_SSML_RATE = '-8%'
+export const EXPLAIN_SSML_PITCH = '+0Hz'
 
 export const DEFAULT_VOICE_WHY =
   'Jenny é a voz neural en-US da Microsoft para treino de escuta: lenta (~-10%), ' +
@@ -88,17 +94,25 @@ export function withListeningPauses(escaped: string): string {
     .replace(/, /g, `,<break time="${SSML_COMMA_BREAK}"/> `)
 }
 
-export function buildSsml(text: string, voice: NeuralVoiceId = DEFAULT_VOICE_ID): string {
-  const body = withListeningPauses(escapeSsmlText(text.trim()))
+export function buildSsml(text: string, voice: ClipVoiceId = DEFAULT_VOICE_ID): string {
+  const explain = voice === EXPLAIN_VOICE_ID
+  const lang = explain ? EXPLAIN_LANG : TTS_LANG
+  const rate = explain ? EXPLAIN_SSML_RATE : SSML_RATE
+  const pitch = explain ? EXPLAIN_SSML_PITCH : SSML_PITCH
+  const escaped = escapeSsmlText(text.trim())
+  const body = explain ? escaped : withListeningPauses(escaped)
   return (
-    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${TTS_LANG}">` +
+    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${lang}">` +
     `<voice name="${voice}">` +
-    `<prosody rate="${SSML_RATE}" pitch="${SSML_PITCH}">${body}</prosody>` +
+    `<prosody rate="${rate}" pitch="${pitch}">${body}</prosody>` +
     `</voice></speak>`
   )
 }
 
-export function ttsCacheFingerprint(voice: NeuralVoiceId, spoken: string): string {
+export function ttsCacheFingerprint(voice: ClipVoiceId, spoken: string): string {
+  if (voice === EXPLAIN_VOICE_ID) {
+    return `v1|${voice}|${EXPLAIN_SSML_RATE}|${EXPLAIN_SSML_PITCH}|${spoken}`
+  }
   return `v1|${voice}|${SSML_RATE}|${SSML_PITCH}|${spoken}`
 }
 
@@ -118,7 +132,7 @@ export async function sha256Hex(value: string): Promise<string> {
   return sha256HexSync(value)
 }
 
-export function ttsAssetHash(voice: NeuralVoiceId, spoken: string): string {
+export function ttsAssetHash(voice: ClipVoiceId, spoken: string): string {
   return sha256HexSync(ttsCacheFingerprint(voice, spoken))
 }
 
@@ -205,7 +219,7 @@ function sha256(bytes: Uint8Array): Uint8Array {
   return out
 }
 
-export function ttsAssetPath(voice: NeuralVoiceId, hash: string): string {
+export function ttsAssetPath(voice: ClipVoiceId, hash: string): string {
   return `tts/${voice}/${hash}.mp3`
 }
 

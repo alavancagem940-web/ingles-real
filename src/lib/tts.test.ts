@@ -133,4 +133,19 @@ describe('speak() toca MPEG Jenny com Audio()', () => {
     expect(uttered.text).toBe(prompt)
     expect(getTtsStatus().engine).toBe('webspeech-fallback')
   })
+
+  it('explicação em português usa Francisca e não corta o áudio no segundo toque', async () => {
+    const prompt = 'Phrasal verb é verbo mais partícula.'
+    const { initTts, unlockTts, speak, audioInstance, speechSpeak, play } = await loadTts()
+    initTts()
+    unlockTts()
+    const playsAfterUnlock = play.mock.calls.length
+    unlockTts()
+    expect(play.mock.calls.length).toBe(playsAfterUnlock)
+    expect(speechSpeak).toHaveBeenCalledTimes(1)
+    speak(prompt, 'explain')
+    await vi.waitFor(() => {
+      expect(audioInstance.src).toContain('pt-BR-FranciscaNeural')
+    })
+  })
 })

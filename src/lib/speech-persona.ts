@@ -1,4 +1,11 @@
-export type SpeakKind = 'prompt' | 'choice' | 'theory' | 'native' | 'feedback-correct' | 'feedback-wrong'
+export type SpeakKind =
+  | 'prompt'
+  | 'choice'
+  | 'theory'
+  | 'native'
+  | 'explain'
+  | 'feedback-correct'
+  | 'feedback-wrong'
 
 /**
  * Turns lesson copy into a single spoken line. No openers, wrappers,
@@ -13,3 +20,4 @@ export function toSpokenText(text: string): string {
 }
 
 export const NATIVE_LISTEN_LABEL = 'Ouvir Pronúncia Nativa'
+export const EXPLAIN_LISTEN_LABEL = 'Ouvir Explicação'

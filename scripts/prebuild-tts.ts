@@ -3,12 +3,13 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { synthesizeBingSsmlCached } from './bing-tts'
 import {
+  EXPLAIN_VOICE_ID,
   NEURAL_VOICES,
   buildSsml,
   collectSpokenLines,
   ttsAssetHash,
   ttsAssetPath,
-  type NeuralVoiceId,
+  type ClipVoiceId,
 } from '../src/lib/microsoft-neural'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -30,13 +31,17 @@ async function mapPool<T>(items: T[], limit: number, worker: (item: T, index: nu
 
 async function main(): Promise<void> {
   const lines = collectSpokenLines()
-  const jobs: { voice: NeuralVoiceId; spoken: string }[] = []
-  for (const voice of NEURAL_VOICES) {
-    for (const line of lines) {
+  const jobs: { voice: ClipVoiceId; spoken: string }[] = []
+  for (const line of lines) {
+    if (line.kind === 'explain') {
+      jobs.push({ voice: EXPLAIN_VOICE_ID, spoken: line.spoken })
+      continue
+    }
+    for (const voice of NEURAL_VOICES) {
       jobs.push({ voice: voice.id, spoken: line.spoken })
     }
   }
-  console.log(`prebuild-tts: ${lines.length} falas × ${NEURAL_VOICES.length} vozes = ${jobs.length} MPEG (Jenny/Ana)`)
+  console.log(`prebuild-tts: ${lines.length} falas, ${jobs.length} MPEG (Jenny/Ana no inglês, Francisca na explicação)`)
 
   let done = 0
   await mapPool(jobs, CONCURRENCY, async (job) => {

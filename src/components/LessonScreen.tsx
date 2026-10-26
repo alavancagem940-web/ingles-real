@@ -255,7 +255,7 @@ function ExercisePanel({
                     disabled={checked}
                     onClick={() => {
                       setSelected(choice)
-                      if (exercise.choicesAreEnglish) speak(choice, 'native')
+                      speak(choice, exercise.choicesAreEnglish ? 'native' : 'explain')
                     }}
                     className={cn(
                       'w-full rounded-2xl border-2 px-4 py-3.5 text-left text-[0.95rem] font-bold leading-snug text-white transition-colors touch-manipulation',
@@ -268,7 +268,11 @@ function ExercisePanel({
                   >
                     {choice}
                   </button>
-                  {exercise.choicesAreEnglish ? <NativeListenButton phrase={choice} /> : null}
+                  {exercise.choicesAreEnglish ? (
+                    <NativeListenButton phrase={choice} />
+                  ) : (
+                    <ExplainListenButton text={choice} />
+                  )}
                 </li>
               )
             })}

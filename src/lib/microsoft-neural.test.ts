@@ -4,6 +4,7 @@ import { toSpokenText } from './speech-persona'
 import {
   DEFAULT_VOICE_ID,
   DEFAULT_VOICE_WHY,
+  EXPLAIN_VOICE_ID,
   FALLBACK_VOICE_ID,
   NEURAL_VOICES,
   SSML_PITCH,
@@ -47,6 +48,24 @@ describe('voz neural Microsoft en-US', () => {
     expect(ssml).not.toContain('rate="+0%"')
     expect(ssml).not.toContain('pitch="+0Hz"')
     expect(ssml).toContain("I'm gonna call you later.")
+  })
+
+  it('a explicação troca para a Jenny na frase em inglês e pausa como professora', () => {
+    const ssml = buildSsml(
+      "Hey, what's up? é um oi informal entre amigos nos EUA.",
+      EXPLAIN_VOICE_ID,
+    )
+    expect(ssml).toContain('name="en-US-JennyNeural"')
+    expect(ssml).toContain('name="pt-BR-FranciscaNeural"')
+    expect(ssml).toContain('break time="560ms"')
+    expect(ssml).toContain('break time="420ms"')
+    expect(ssml.indexOf('en-US-JennyNeural')).toBeLessThan(ssml.indexOf('pt-BR-FranciscaNeural'))
+    const choice = buildSsml('Oi, e aí?', EXPLAIN_VOICE_ID)
+    expect(choice).toContain('name="pt-BR-FranciscaNeural"')
+    expect(choice).not.toContain('en-US-JennyNeural')
+    expect(collectSpokenLines().some((line) => line.kind === 'explain' && line.spoken.includes('oi informal'))).toBe(
+      true,
+    )
   })
 
   it('coleta o inglês visível, sem reescrever o currículo em português', () => {

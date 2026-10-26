@@ -219,7 +219,7 @@ function ChoiceRow({
         disabled={checked}
         onClick={() => {
           onSelect(choice)
-          if (question.choicesAreEnglish) speak(choice, 'native')
+          speak(choice, question.choicesAreEnglish ? 'native' : 'explain')
         }}
         className={cn(
           'w-full rounded-2xl border-2 px-4 py-3.5 text-left text-[0.95rem] font-bold leading-snug text-white touch-manipulation',
@@ -232,7 +232,11 @@ function ChoiceRow({
       >
         {choice}
       </button>
-      {question.choicesAreEnglish ? <NativeListenButton phrase={choice} /> : null}
+      {question.choicesAreEnglish ? (
+        <NativeListenButton phrase={choice} />
+      ) : (
+        <ExplainListenButton text={choice} />
+      )}
     </li>
   )
 }

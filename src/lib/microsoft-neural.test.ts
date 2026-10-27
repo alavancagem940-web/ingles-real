@@ -59,6 +59,7 @@ describe('voz neural Microsoft en-US', () => {
     expect(ssml).toContain('name="pt-BR-FranciscaNeural"')
     expect(ssml).toContain('break time="560ms"')
     expect(ssml).toContain('break time="420ms"')
+    expect(ssml).not.toContain('</voice><break')
     expect(ssml.indexOf('en-US-JennyNeural')).toBeLessThan(ssml.indexOf('pt-BR-FranciscaNeural'))
     const choice = buildSsml('Oi, e aí?', EXPLAIN_VOICE_ID)
     expect(choice).toContain('name="pt-BR-FranciscaNeural"')

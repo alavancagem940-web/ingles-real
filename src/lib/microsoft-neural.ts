@@ -106,8 +106,9 @@ export function withTeacherPauses(escaped: string): string {
     .replace(/,(?=\s)/g, `,<break time="${TEACHER_COMMA_BREAK}"/>`)
 }
 
-function teacherVoice(lang: 'en' | 'pt', spoken: string): string {
-  const body = withTeacherPauses(escapeSsmlText(spoken.trim()))
+function teacherVoice(lang: 'en' | 'pt', spoken: string, leadBreak: boolean): string {
+  const paused = withTeacherPauses(escapeSsmlText(spoken.trim()))
+  const body = leadBreak ? `<break time="${TEACHER_SWITCH_BREAK}"/>${paused}` : paused
   if (lang === 'en') {
     return `<voice name="${DEFAULT_VOICE_ID}"><prosody rate="-8%" pitch="+0Hz">${body}</prosody></voice>`
   }
@@ -121,8 +122,8 @@ function teacherVoice(lang: 'en' | 'pt', spoken: string): string {
 export function buildSsml(text: string, voice: ClipVoiceId = DEFAULT_VOICE_ID): string {
   if (voice === EXPLAIN_VOICE_ID) {
     const parts = teacherSegments(text)
-      .map((segment) => teacherVoice(segment.lang, segment.text))
-      .join(`<break time="${TEACHER_SWITCH_BREAK}"/>`)
+      .map((segment, index) => teacherVoice(segment.lang, segment.text, index > 0))
+      .join('')
     return (
       `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${EXPLAIN_LANG}">` +
       `${parts}</speak>`

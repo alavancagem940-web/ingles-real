@@ -2,16 +2,18 @@ import { useEffect, useRef, useState } from 'react'
 import {
   BAND_LABEL,
   BAND_UNLOCK_COPY,
-  PLACEMENT_PASS,
   bandFromProgress,
+  drawPlacementRound,
   nextPlacementDifficulty,
-  questionsForRound,
+  placementPassMark,
+  PLACEMENT_ROUND_SIZE,
   type PlacementBand,
   type PlacementDifficulty,
   type PlacementQuestion,
 } from '../lib/placement'
 import { shuffledChoices } from '../lib/shuffle'
 import { speak, unlockTts } from '../lib/tts'
+import { ExplanationBlock, playExplanation } from './ExplanationBlock'
 import { Button } from './ui/button'
 import { ExplainListenButton } from './ExplainListenButton'
 import { GlossaryText } from './GlossaryNote'
@@ -30,21 +32,21 @@ type PlacementScreenProps = {
 
 export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onCancel }: PlacementScreenProps) {
   const [difficulty, setDifficulty] = useState<PlacementDifficulty>('easy')
+  const [round, setRound] = useState<PlacementQuestion[]>(() => drawPlacementRound('easy'))
   const [index, setIndex] = useState(0)
   const correctRef = useRef(0)
   const [selected, setSelected] = useState<string | null>(null)
   const [checked, setChecked] = useState(false)
   const [lastCorrect, setLastCorrect] = useState<boolean | null>(null)
   const [result, setResult] = useState<PlacementBand | null>(null)
+  const [choiceKey, setChoiceKey] = useState('')
   const [choices, setChoices] = useState<string[]>([])
 
-  const round = questionsForRound(difficulty)
   const question = round[index]
-
-  useEffect(() => {
-    if (!question) return
+  if (question && choiceKey !== question.id) {
+    setChoiceKey(question.id)
     setChoices(shuffledChoices(question.choices))
-  }, [question])
+  }
 
   useEffect(() => {
     if (!question || result || question.choicesAreEnglish) return
@@ -62,7 +64,7 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
         <p className="mt-3 text-sm text-muted">
           {retake
             ? 'O XP e as lições já feitas continuam neste aparelho. Só o patamar de desbloqueio foi atualizado.'
-            : 'Quem já sabe não começa do zero: os módulos daquele patamar já abrem.'}
+            : 'A bolinha em destaque na trilha é a primeira lição desse patamar.'}
         </p>
         <Button className="mt-8" size="lg" onClick={() => onFinished(result)}>
           Ir para a trilha
@@ -79,14 +81,15 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
     )
   }
 
-  const progressValue = ((difficultyIndex(difficulty) * round.length + index) / 9) * 100
+  const progressValue = ((difficultyIndex(difficulty) * PLACEMENT_ROUND_SIZE + index) / (PLACEMENT_ROUND_SIZE * 3)) * 100
 
   function finishRound(finalCorrect: number) {
-    const next = nextPlacementDifficulty(difficulty, finalCorrect)
+    const next = nextPlacementDifficulty(difficulty, finalCorrect, round.length)
     if (next === 'done') {
-      setResult(bandFromProgress(difficulty, finalCorrect))
+      setResult(bandFromProgress(difficulty, finalCorrect, round.length))
       return
     }
+    setRound(drawPlacementRound(next))
     setDifficulty(next)
     setIndex(0)
     correctRef.current = 0
@@ -102,7 +105,7 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
     setChecked(true)
     setLastCorrect(ok)
     correctRef.current += ok ? 1 : 0
-    speak(ok ? question.explainCorrect : question.explainWrong, 'explain')
+    playExplanation(ok ? question.explainCorrect : question.explainWrong, [question.nativePhrase])
   }
 
   function advance() {
@@ -130,7 +133,8 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
         </div>
         <h1 className="mt-2 text-xl font-extrabold text-white">Perguntas progressivas</h1>
         <p className="mt-1 text-xs text-muted">
-          Fácil → difícil. Acertar {PLACEMENT_PASS} de {round.length} neste bloco sobe o nível do teste.
+          Fácil → difícil. Acertar {placementPassMark(round.length)} de {round.length} neste bloco sobe o nível.
+          As perguntas mudam cada vez que você faz o teste.
         </p>
         <Progress className="mt-3" value={progressValue} />
       </div>
@@ -139,9 +143,9 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
         <p className="text-xs font-bold text-muted">
           Bloco {labelDifficulty(difficulty)} · pergunta {index + 1} de {round.length}
         </p>
-        <h2 className="mt-2 text-lg font-extrabold leading-snug text-white">
+        <div className="mt-2 text-lg font-extrabold leading-snug text-white">
           <GlossaryText text={question.prompt} seen={seenTerms} onSeen={onSeenTerm} />
-        </h2>
+        </div>
         {question.choicesAreEnglish ||
         question.nativePhrase.trim() === question.answer.trim() ||
         question.choices.some((choice) => choice.trim() === question.nativePhrase.trim()) ? (
@@ -176,16 +180,14 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
             Verificar
           </Button>
         ) : (
-          <div className={cn('rounded-2xl p-4', lastCorrect ? 'bg-green-soft' : 'bg-red-soft')}>
+          <div className={cn('max-h-[70svh] overflow-y-auto rounded-2xl p-4', lastCorrect ? 'bg-green-soft' : 'bg-red-soft')}>
             <p className={cn('font-extrabold', lastCorrect ? 'text-green' : 'text-red')}>
               {lastCorrect ? 'Correto' : 'Ainda não'}
             </p>
-            <p className="mt-1 text-sm leading-relaxed text-white/90">
-              {lastCorrect ? question.explainCorrect : question.explainWrong}
-            </p>
-            <div className="mt-2">
-              <ExplainListenButton text={lastCorrect ? question.explainCorrect : question.explainWrong} />
-            </div>
+            <ExplanationBlock
+              text={lastCorrect ? question.explainCorrect : question.explainWrong}
+              anchors={[question.nativePhrase]}
+            />
             <Button className="mt-3 w-full" onClick={advance}>
               Continuar
             </Button>

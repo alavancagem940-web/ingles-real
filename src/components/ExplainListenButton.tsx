@@ -1,14 +1,15 @@
 import { Volume2 } from 'lucide-react'
 import { EXPLAIN_LISTEN_LABEL } from '../lib/speech-persona'
-import { speak, unlockTts } from '../lib/tts'
+import { speak, speakPortugueseThenNative, unlockTts } from '../lib/tts'
 import { Button } from './ui/button'
 
 type ExplainListenButtonProps = {
   text: string
   className?: string
+  thenNative?: readonly string[]
 }
 
-export function ExplainListenButton({ text, className }: ExplainListenButtonProps) {
+export function ExplainListenButton({ text, className, thenNative = [] }: ExplainListenButtonProps) {
   return (
     <Button
       variant="gold"
@@ -18,7 +19,8 @@ export function ExplainListenButton({ text, className }: ExplainListenButtonProp
       onClick={(event) => {
         event.stopPropagation()
         unlockTts()
-        speak(text, 'explain')
+        if (thenNative.length > 0) speakPortugueseThenNative(text, thenNative)
+        else speak(text, 'explain')
       }}
     >
       <Volume2 className="size-4 shrink-0" aria-hidden />

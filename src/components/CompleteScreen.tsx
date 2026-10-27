@@ -14,15 +14,16 @@ export function CompleteScreen({ level, unit, correctCount, passed, onHome, onRe
   const total = unit.exercises.length
   const needed = challengePassThreshold(total)
   const challengeUnit = unit.kind === 'challenge'
-  const failed = challengeUnit && !passed
+  const failed = !passed
+  const nextLabel = nextLevelLabel(level)
+  const gate = challengeUnit ? `para desbloquear ${nextLabel}` : 'para abrir a próxima lição'
 
   const title = failed ? 'Ainda não passou' : challengeUnit ? 'Desafio concluído' : 'Lição concluída'
-  const nextLabel = nextLevelLabel(level)
   const body = failed
-    ? `Você acertou ${correctCount} de ${total}. É preciso acertar pelo menos ${needed} (~75%) para desbloquear ${nextLabel}. Tente de novo quando quiser — o XP fica.`
+    ? `Você acertou ${correctCount} de ${total}. É preciso acertar pelo menos ${needed} (~75%) ${gate}. Tente de novo quando quiser — o XP de cada acerto fica.`
     : challengeUnit
       ? `Você acertou ${correctCount} de ${total} (mínimo ${needed}). +${unit.xpReward} XP. ${nextLabel === 'o diploma da trilha' ? 'Você fechou a trilha de inglês falado.' : 'O próximo patamar está liberado.'}`
-      : `Você acertou ${correctCount} de ${total}. +${unit.xpReward} XP de bônus. Siga para a próxima bolinha da trilha.`
+      : `Você acertou ${correctCount} de ${total} (mínimo ${needed}). +${unit.xpReward} XP. A próxima lição está liberada.`
 
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center">
@@ -33,7 +34,7 @@ export function CompleteScreen({ level, unit, correctCount, passed, onHome, onRe
       <p className="max-w-sm text-sm leading-relaxed text-muted">{body}</p>
       <div className="flex w-full max-w-xs flex-col gap-3 pt-4">
         {failed ? (
-          <Button onClick={onRetry}>Tentar o desafio de novo</Button>
+          <Button onClick={onRetry}>{challengeUnit ? 'Tentar o desafio de novo' : 'Tentar a lição de novo'}</Button>
         ) : (
           <Button onClick={onHome}>Voltar à trilha</Button>
         )}

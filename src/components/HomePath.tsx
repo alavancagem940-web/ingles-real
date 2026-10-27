@@ -36,7 +36,7 @@ export function HomePath({ store, tts, onStart, onReset, onRetake, onInstall, ca
         <h1 className="text-[1.65rem] font-extrabold leading-tight text-white">Sua trilha de inglês falado</h1>
         <p className="mt-1 text-sm leading-relaxed text-muted">
           {band
-            ? `Patamar ${BAND_LABEL[band]}. Cada módulo abre com a Explicação Teórica Prática e a pronúncia nativa de cada frase.`
+            ? `Patamar ${BAND_LABEL[band]}. A bolinha em destaque é a lição desse nível. Cada lição pede cerca de 75% para abrir a próxima.`
             : 'Faça o teste de nivelamento para destrancar o patamar certo.'}
         </p>
         {store.position ? (

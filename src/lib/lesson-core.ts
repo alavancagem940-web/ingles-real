@@ -291,6 +291,11 @@ export function challengePassThreshold(total: number): number {
   return Math.max(1, Math.ceil(total * 0.75))
 }
 
+/** Lessons and challenges both need about 75% before the next one opens. */
+export function unitPassed(correct: number, total: number): boolean {
+  return correct >= challengePassThreshold(total)
+}
+
 const PLACEHOLDER = /lorem ipsum|#\s*todo\b|#\s*placeholder|\.{3}/i
 
 export function assertTheoryComplete(unitId: string, spec: Theory): void {

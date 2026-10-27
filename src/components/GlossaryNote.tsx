@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { glossarySpans, type GlossarySpan } from '../lib/glossary'
-import { ExplainListenButton } from './ExplainListenButton'
+import { ExplanationBlock } from './ExplanationBlock'
 
 type GlossaryTextProps = {
   text: string
@@ -71,7 +71,7 @@ export function GlossaryText({ text, seen, onSeen }: GlossaryTextProps) {
         )
       })}
       {openSpan ? (
-        <span
+        <div
           role="note"
           className="relative mt-3 block w-full rounded-2xl border border-gold/50 bg-[#3D3411] px-3 py-3 text-left text-base font-medium shadow-[0_10px_24px_rgba(0,0,0,0.35)]"
         >
@@ -82,22 +82,24 @@ export function GlossaryText({ text, seen, onSeen }: GlossaryTextProps) {
           <span className="block text-[11px] font-extrabold uppercase tracking-[0.14em] text-gold">Termo da aula</span>
           <span className="mt-1 block text-sm font-extrabold text-white">{openSpan.term.title}</span>
           <span className="mt-1 block text-sm leading-relaxed text-white/90">{openSpan.term.body}</span>
-          <span className="mt-2 flex items-center justify-between gap-2">
-            <ExplainListenButton text={`${openSpan.term.title}. ${openSpan.term.body}`} />
-            <button
-              type="button"
-              className="text-xs font-bold text-gold underline"
-              onClick={(event) => {
-                event.stopPropagation()
-                setManual(null)
-                setClosed(true)
-                remember(openSpan.term.id)
-              }}
-            >
-              Fechar
-            </button>
-          </span>
-        </span>
+          <ExplanationBlock
+            text={`${openSpan.term.title}. ${openSpan.term.body}`}
+            anchors={openSpan.term.spokenEnglish}
+            showText={false}
+          />
+          <button
+            type="button"
+            className="mt-2 text-xs font-bold text-gold underline"
+            onClick={(event) => {
+              event.stopPropagation()
+              setManual(null)
+              setClosed(true)
+              remember(openSpan.term.id)
+            }}
+          >
+            Fechar
+          </button>
+        </div>
       ) : null}
     </>
   )

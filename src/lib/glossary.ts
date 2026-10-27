@@ -3,6 +3,7 @@ export type GlossaryTerm = {
   title: string
   body: string
   pattern: RegExp
+  spokenEnglish: readonly string[]
 }
 
 export const GLOSSARY: readonly GlossaryTerm[] = [
@@ -10,24 +11,28 @@ export const GLOSSARY: readonly GlossaryTerm[] = [
     id: 'phrasal-verb',
     title: 'Phrasal verb',
     body: 'É o nome de um verbo colado numa partícula, como out, up ou into. A partícula muda o sentido, então não traduz palavra por palavra. Você não precisa ter estudado esse nome: a pergunta mostra as frases.',
+    spokenEnglish: ['out', 'up', 'into'],
     pattern: /phrasal(?:\s+verbs?)?/i,
   },
   {
     id: 'idiom',
     title: 'Idiom',
     body: 'É o nome de uma expressão pronta. O sentido não é a soma das palavras. Você não precisa conhecer esse nome para responder: leia a frase em inglês e escolha o que ela quer dizer.',
+    spokenEnglish: [],
     pattern: /\bidioms?\b/i,
   },
   {
     id: 'slang',
     title: 'Gíria',
     body: 'Gíria é uma palavra informal da conversa. O dicionário formal quase não ensina esse uso. O nome só avisa o tipo de palavra; o sentido está na frase.',
+    spokenEnglish: [],
     pattern: /\b(?:slangs?|gírias?)\b/i,
   },
   {
     id: 'reducao',
     title: 'Redução',
     body: 'Redução é quando a fala cola palavras e corta sons. O inglês escrito continua inteiro; o falado encurta. O nome só classifica isso. A forma falada aparece na pergunta.',
+    spokenEnglish: [],
     pattern: /redu(?:ção|ções|cao|coes)/i,
   },
 ]

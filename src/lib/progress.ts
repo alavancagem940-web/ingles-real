@@ -263,7 +263,16 @@ export class ProgressStore {
   }
 
   currentUnit(): { level: Level; unit: Unit } | null {
-    for (const level of LEVELS) {
+    const startRank = this.placementBand ? bandRank(this.placementBand) : 0
+    const ordered = [...LEVELS].sort((left, right) => {
+      const leftRank = levelUnlockRank(left.id)
+      const rightRank = levelUnlockRank(right.id)
+      const leftPref = leftRank >= startRank ? 0 : 1
+      const rightPref = rightRank >= startRank ? 0 : 1
+      if (leftPref !== rightPref) return leftPref - rightPref
+      return leftRank - rightRank
+    })
+    for (const level of ordered) {
       for (const unit of level.units) {
         if (this.isUnitUnlocked(level.id, unit.id) && !this.completedUnits.includes(unit.id)) {
           return { level, unit }

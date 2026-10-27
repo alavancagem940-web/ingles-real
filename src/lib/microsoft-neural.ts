@@ -1,7 +1,8 @@
 import { PLACEMENT_QUESTIONS } from './placement'
 import { LEVELS, spokenExplanation, spokenNative, spokenTheory } from './lessons'
 import { type SpeakKind, toSpokenText } from './speech-persona'
-import { teacherSegments } from './teacher-speech'
+import { GLOSSARY } from './glossary'
+import { nativePhrasesIn } from './native-snippets'
 
 /** Web Speech fallback: slightly slow and clear, never default-fast. */
 export const TTS_RATE = 0.85
@@ -37,7 +38,6 @@ export const EXPLAIN_SSML_RATE = '-6%'
 export const EXPLAIN_SSML_PITCH = '+1Hz'
 export const TEACHER_SENTENCE_BREAK = '560ms'
 export const TEACHER_COMMA_BREAK = '280ms'
-export const TEACHER_SWITCH_BREAK = '420ms'
 
 export const DEFAULT_VOICE_WHY =
   'Jenny é a voz neural en-US da Microsoft para treino de escuta: lenta (~-10%), ' +
@@ -106,27 +106,14 @@ export function withTeacherPauses(escaped: string): string {
     .replace(/,(?=\s)/g, `,<break time="${TEACHER_COMMA_BREAK}"/>`)
 }
 
-function teacherVoice(lang: 'en' | 'pt', spoken: string, leadBreak: boolean): string {
-  const paused = withTeacherPauses(escapeSsmlText(spoken.trim()))
-  const body = leadBreak ? `<break time="${TEACHER_SWITCH_BREAK}"/>${paused}` : paused
-  if (lang === 'en') {
-    return `<voice name="${DEFAULT_VOICE_ID}"><prosody rate="-8%" pitch="+0Hz">${body}</prosody></voice>`
-  }
-  return (
-    `<voice name="${EXPLAIN_VOICE_ID}">` +
-    `<prosody rate="${EXPLAIN_SSML_RATE}" pitch="${EXPLAIN_SSML_PITCH}">${body}</prosody>` +
-    `</voice>`
-  )
-}
-
 export function buildSsml(text: string, voice: ClipVoiceId = DEFAULT_VOICE_ID): string {
   if (voice === EXPLAIN_VOICE_ID) {
-    const parts = teacherSegments(text)
-      .map((segment, index) => teacherVoice(segment.lang, segment.text, index > 0))
-      .join('')
+    const body = withTeacherPauses(escapeSsmlText(text.trim()))
     return (
       `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="${EXPLAIN_LANG}">` +
-      `${parts}</speak>`
+      `<voice name="${EXPLAIN_VOICE_ID}">` +
+      `<prosody rate="${EXPLAIN_SSML_RATE}" pitch="${EXPLAIN_SSML_PITCH}">${body}</prosody>` +
+      `</voice></speak>`
     )
   }
   const escaped = escapeSsmlText(text.trim())
@@ -141,7 +128,7 @@ export function buildSsml(text: string, voice: ClipVoiceId = DEFAULT_VOICE_ID): 
 
 export function ttsCacheFingerprint(voice: ClipVoiceId, spoken: string): string {
   if (voice === EXPLAIN_VOICE_ID) {
-    return `v2|teacher|${voice}|${EXPLAIN_SSML_RATE}|${EXPLAIN_SSML_PITCH}|${spoken}`
+    return `v3|francisca|${voice}|${EXPLAIN_SSML_RATE}|${EXPLAIN_SSML_PITCH}|${spoken}`
   }
   return `v1|${voice}|${SSML_RATE}|${SSML_PITCH}|${spoken}`
 }
@@ -276,6 +263,9 @@ export function collectSpokenLines(): SpokenLine[] {
     if (!spoken || seen.has(key)) return
     seen.add(key)
     lines.push({ kind, source, spoken })
+    if (kind === 'explain') {
+      for (const phrase of nativePhrasesIn(spoken)) add(phrase, 'native')
+    }
   }
 
   for (const level of LEVELS) {
@@ -294,6 +284,11 @@ export function collectSpokenLines(): SpokenLine[] {
         for (const phrase of exercise.phrases) add(phrase, 'native')
       }
     }
+  }
+
+  for (const term of GLOSSARY) {
+    add(`${term.title}. ${term.body}`, 'explain')
+    for (const phrase of term.spokenEnglish) add(phrase, 'native')
   }
 
   for (const question of PLACEMENT_QUESTIONS) {

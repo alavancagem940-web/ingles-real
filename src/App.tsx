@@ -7,10 +7,10 @@ import { LoadingScreen } from './components/LoadingScreen'
 import { ErrorScreen } from './components/ErrorScreen'
 import { PlacementScreen } from './components/PlacementScreen'
 import {
-  challengePassThreshold,
   levelForUnit,
   spokenExplanation,
   unitById,
+  unitPassed,
   validateCurriculum,
 } from './lib/lessons'
 import type { PlacementBand } from './lib/placement'
@@ -128,14 +128,10 @@ export default function App() {
       setScreen({ name: 'error', message: 'Lição não encontrada no currículo.', allowReset: false })
       return
     }
-    const needed = challengePassThreshold(unit.exercises.length)
-    const passed = unit.kind === 'challenge' ? correctCount >= needed : true
-    if (unit.kind === 'challenge') {
-      if (passed) store.markChallengePassed(level.id, unit.id, unit.xpReward)
-      else store.savePosition(null)
-    } else {
-      store.markUnitComplete(unit.id, unit.xpReward)
-    }
+    const passed = unitPassed(correctCount, unit.exercises.length)
+    if (!passed) store.savePosition(null)
+    else if (unit.kind === 'challenge') store.markChallengePassed(level.id, unit.id, unit.xpReward)
+    else store.markUnitComplete(unit.id, unit.xpReward)
     refreshXp()
     setScreen({ name: 'complete', unitId, correctCount, passed })
   }

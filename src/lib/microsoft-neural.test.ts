@@ -50,23 +50,22 @@ describe('voz neural Microsoft en-US', () => {
     expect(ssml).toContain("I'm gonna call you later.")
   })
 
-  it('a explicação troca para a Jenny na frase em inglês e pausa como professora', () => {
+  it('a explicação inteira fica com a Francisca, sem cortar no meio para a Jenny', () => {
     const ssml = buildSsml(
       "Hey, what's up? é um oi informal entre amigos nos EUA.",
       EXPLAIN_VOICE_ID,
     )
-    expect(ssml).toContain('name="en-US-JennyNeural"')
     expect(ssml).toContain('name="pt-BR-FranciscaNeural"')
+    expect(ssml).not.toContain('en-US-JennyNeural')
     expect(ssml).toContain('break time="560ms"')
-    expect(ssml).toContain('break time="420ms"')
-    expect(ssml).not.toContain('</voice><break')
-    expect(ssml.indexOf('en-US-JennyNeural')).toBeLessThan(ssml.indexOf('pt-BR-FranciscaNeural'))
+    expect(ssml.match(/<voice /g)).toHaveLength(1)
     const choice = buildSsml('Oi, e aí?', EXPLAIN_VOICE_ID)
     expect(choice).toContain('name="pt-BR-FranciscaNeural"')
     expect(choice).not.toContain('en-US-JennyNeural')
-    expect(collectSpokenLines().some((line) => line.kind === 'explain' && line.spoken.includes('oi informal'))).toBe(
-      true,
-    )
+    const lines = collectSpokenLines()
+    expect(lines.some((line) => line.kind === 'explain' && line.spoken.includes('oi informal'))).toBe(true)
+    expect(lines.some((line) => line.kind === 'explain' && line.spoken.includes('partícula'))).toBe(true)
+    expect(ttsCacheFingerprint(EXPLAIN_VOICE_ID, 'oi').startsWith('v3|francisca|')).toBe(true)
   })
 
   it('coleta o inglês visível, sem reescrever o currículo em português', () => {

@@ -12,6 +12,7 @@ export {
   NATIVE_LISTEN_LABEL,
   THEORY_CARD_TITLE,
   challengePassThreshold,
+  unitPassed,
   checkAnswer,
   englishPhrasesOf,
   spokenNative,

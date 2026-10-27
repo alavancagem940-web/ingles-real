@@ -77,6 +77,17 @@ describe('progresso localStorage', () => {
     expect(second.placementBand).toBe('iniciante')
   })
 
+  it('começa a trilha no patamar do teste, não na primeira lição do Básico', () => {
+    const store = new ProgressStore(createMemoryStorage())
+    store.load()
+    store.completePlacement('intermediario')
+    expect(store.currentUnit()?.unit.id).toBe('i1_gotta_shoulda')
+    store.retakePlacement('avancado')
+    expect(store.currentUnit()?.unit.id).toBe('a1_idioms')
+    store.retakePlacement('iniciante')
+    expect(store.currentUnit()?.unit.id).toBe('b1_gonna_wanna')
+  })
+
   it('libera a próxima lição ao concluir a anterior', () => {
     const store = new ProgressStore(createMemoryStorage())
     store.load()

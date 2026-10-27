@@ -74,6 +74,9 @@ let player: HTMLAudioElement | null = null
 let objectUrl: string | null = null
 let speakSeq = 0
 let neuralSeq = -1
+let clipSerial = 0
+let followId = 0
+let followFn: (() => void) | null = null
 let graceTimer: ReturnType<typeof setTimeout> | null = null
 let resumeTimer: ReturnType<typeof setInterval> | null = null
 let unlockBound = false
@@ -200,11 +203,19 @@ function cancelWebSpeech(): void {
 
 function pauseAudioKeepingUnlock(): void {
   if (!player) return
+  player.onended = null
   try {
     player.pause()
   } catch {
     // Ignore DOM exceptions while pausing.
   }
+}
+
+function consumeFollow(id: number): void {
+  if (id !== followId || !followFn) return
+  const run = followFn
+  followFn = null
+  run()
 }
 
 export function getTtsStatus(): TtsStatus {
@@ -310,6 +321,8 @@ export function unlockTts(): void {
 export function stopTts(): void {
   speakSeq += 1
   neuralSeq = -1
+  followFn = null
+  followId = 0
   if (graceTimer != null) {
     clearTimeout(graceTimer)
     graceTimer = null
@@ -327,8 +340,13 @@ async function fetchMpeg(url: string, init?: RequestInit): Promise<Blob | null> 
   return new Blob([buffer], { type: 'audio/mpeg' })
 }
 
-function playFromUrl(url: string): Promise<void> {
+function bindClipEnd(audio: HTMLAudioElement, id: number): void {
+  audio.onended = () => consumeFollow(id)
+}
+
+function playFromUrl(url: string, clipId: number): Promise<void> {
   const audio = getPlayer()
+  audio.onended = null
   try {
     audio.pause()
   } catch {
@@ -338,11 +356,13 @@ function playFromUrl(url: string): Promise<void> {
   audio.muted = false
   audio.src = url
   audio.volume = TTS_VOLUME
+  bindClipEnd(audio, clipId)
   return audio.play()
 }
 
-function playBlob(blob: Blob): Promise<void> {
+function playBlob(blob: Blob, clipId: number): Promise<void> {
   const audio = getPlayer()
+  audio.onended = null
   try {
     audio.pause()
   } catch {
@@ -353,6 +373,7 @@ function playBlob(blob: Blob): Promise<void> {
   audio.muted = false
   audio.src = objectUrl
   audio.volume = TTS_VOLUME
+  bindClipEnd(audio, clipId)
   return audio.play()
 }
 
@@ -384,7 +405,7 @@ function pickFallbackVoice(synth: SpeechSynthesis, lang: string): SpeechSynthesi
   )
 }
 
-function speakWebSpeechFallback(spoken: string, voice: ClipVoiceId): void {
+function speakWebSpeechFallback(spoken: string, voice: ClipVoiceId, clipId: number): void {
   const synth = speechSynth()
   if (!synth) {
     throw new Error('no-webspeech')
@@ -397,6 +418,7 @@ function speakWebSpeechFallback(spoken: string, voice: ClipVoiceId): void {
   utterance.volume = TTS_VOLUME
   const fallbackVoice = pickFallbackVoice(synth, utterance.lang)
   if (fallbackVoice) utterance.voice = fallbackVoice
+  utterance.onend = () => consumeFollow(clipId)
   synth.speak(utterance)
   watchWebSpeech()
 }
@@ -404,7 +426,7 @@ function speakWebSpeechFallback(spoken: string, voice: ClipVoiceId): void {
 function startWebSpeechFallback(seq: number, spoken: string, voice: ClipVoiceId): void {
   if (seq !== speakSeq || neuralSeq === seq) return
   try {
-    speakWebSpeechFallback(spoken, voice)
+    speakWebSpeechFallback(spoken, voice, followId)
     engine = 'webspeech-fallback'
     hint = FALLBACK_HINT
     emit()
@@ -428,13 +450,13 @@ function markNeuralPlaying(seq: number): void {
   emit()
 }
 
-async function playNeural(spoken: string, voice: ClipVoiceId, seq: number): Promise<void> {
+async function playNeural(spoken: string, voice: ClipVoiceId, seq: number, clipId: number): Promise<void> {
   const voices: ClipVoiceId[] =
     voice === EXPLAIN_VOICE_ID ? [EXPLAIN_VOICE_ID] : [DEFAULT_VOICE_ID, FALLBACK_VOICE_ID]
   for (const candidate of voices) {
     if (seq !== speakSeq) return
     try {
-      await playFromUrl(packedMpegUrl(spoken, candidate))
+      await playFromUrl(packedMpegUrl(spoken, candidate), clipId)
       markNeuralPlaying(seq)
       return
     } catch (error) {
@@ -454,7 +476,7 @@ async function playNeural(spoken: string, voice: ClipVoiceId, seq: number): Prom
           body: JSON.stringify({ text: spoken, voice: candidate }),
         })
         if (live && seq === speakSeq) {
-          await playBlob(live)
+          await playBlob(live, clipId)
           markNeuralPlaying(seq)
           return
         }
@@ -472,13 +494,15 @@ async function playNeural(spoken: string, voice: ClipVoiceId, seq: number): Prom
   startWebSpeechFallback(seq, spoken, voice)
 }
 
-export function speak(text: string, kind: SpeakKind = 'native'): void {
+function startClip(text: string, kind: SpeakKind, after: (() => void) | null): void {
   if (!text.trim() || engine === 'unavailable') return
   const spoken = toSpokenText(text)
   if (!spoken) return
   unlocked = true
   const voice = voiceForKind(kind)
   const seq = ++speakSeq
+  const clipId = ++clipSerial
+  followFn = null
   if (graceTimer != null) {
     clearTimeout(graceTimer)
     graceTimer = null
@@ -487,12 +511,30 @@ export function speak(text: string, kind: SpeakKind = 'native'): void {
   cancelWebSpeech()
   speakSeq = seq
   neuralSeq = -1
+  followId = clipId
+  followFn = after
 
   graceTimer = setTimeout(() => {
     startWebSpeechFallback(seq, spoken, voice)
   }, MPEG_GRACE_MS)
 
-  void playNeural(spoken, voice, seq)
+  void playNeural(spoken, voice, seq, clipId)
+}
+
+export function speak(text: string, kind: SpeakKind = 'native'): void {
+  followFn = null
+  startClip(text, kind, null)
+}
+
+/** Francisca reads the whole line, then Jenny says each English piece. */
+export function speakPortugueseThenNative(explanation: string, nativePhrases: readonly string[]): void {
+  const phrases = nativePhrases.map((phrase) => phrase.trim()).filter(Boolean)
+  const playNext = (index: number): void => {
+    const phrase = phrases[index]
+    if (!phrase) return
+    startClip(phrase, 'native', () => playNext(index + 1))
+  }
+  startClip(explanation, 'explain', phrases.length > 0 ? () => playNext(0) : null)
 }
 
 export function isStandaloneDisplay(): boolean {

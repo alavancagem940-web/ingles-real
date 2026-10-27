@@ -9,6 +9,7 @@ function mpegAudioMock(play: ReturnType<typeof vi.fn>) {
     load: vi.fn(),
     preload: 'auto',
     playsInline: true,
+    onended: null as null | (() => void),
     volume: 1,
     muted: false,
     paused: true,
@@ -146,6 +147,18 @@ describe('speak() toca MPEG Jenny com Audio()', () => {
     speak(prompt, 'explain')
     await vi.waitFor(() => {
       expect(audioInstance.src).toContain('pt-BR-FranciscaNeural')
+    })
+  })
+
+  it('depois da explicação em português toca a frase nativa', async () => {
+    const { speakPortugueseThenNative, audioInstance } = await loadTts()
+    speakPortugueseThenNative('É um oi informal.', ["Hey, what's up?"])
+    await vi.waitFor(() => {
+      expect(audioInstance.src).toContain('pt-BR-FranciscaNeural')
+    })
+    audioInstance.onended?.()
+    await vi.waitFor(() => {
+      expect(audioInstance.src).toContain('en-US-JennyNeural')
     })
   })
 })

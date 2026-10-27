@@ -11,6 +11,7 @@ import {
 } from '../lib/lessons'
 import { XP_PER_CORRECT, type LessonPhase, type ProgressStore } from '../lib/progress'
 import { speak, stopTts, unlockTts } from '../lib/tts'
+import { ExplanationBlock, playExplanation } from './ExplanationBlock'
 import { shuffledChoices } from '../lib/shuffle'
 import { Button } from './ui/button'
 import { Progress } from './ui/progress'
@@ -221,7 +222,7 @@ function ExercisePanel({
     setChecked(true)
     setLastCorrect(result.correct)
     setMessage(result.message)
-    speak(result.correct ? exercise.explainCorrect : exercise.explainWrong, 'explain')
+    playExplanation(result.message, [exercise.nativePhrase])
     if (result.correct) onCorrect(submission)
     else onIncorrect(submission)
   }
@@ -232,9 +233,9 @@ function ExercisePanel({
         <p className="text-xs font-bold text-muted">
           Pergunta {index + 1} de {total}
         </p>
-        <h1 className="mt-2 whitespace-pre-wrap text-[1.35rem] font-extrabold leading-snug text-white">
+        <div className="mt-2 whitespace-pre-wrap text-[1.35rem] font-extrabold leading-snug text-white">
           <GlossaryText text={exercise.prompt} seen={seenTerms} onSeen={onSeenTerm} />
-        </h1>
+        </div>
         {exercise.type !== 'multiple_choice' || showsPhraseBeforeAnswer(exercise) || checked ? (
           <div className="mt-3">
             <PhraseBlock english={exercise.nativePhrase} />
@@ -280,13 +281,13 @@ function ExercisePanel({
 
         {exercise.type === 'fill_blank' ? (
           <div className="mt-5">
-            <p className="text-xs text-muted">
+            <div className="text-xs text-muted">
               <GlossaryText
                 text="Digite a peça em inglês (redução, gíria ou phrasal)."
                 seen={seenTerms}
                 onSeen={onSeenTerm}
               />
-            </p>
+            </div>
             <input
               ref={fillRef}
               value={fillValue}
@@ -377,29 +378,23 @@ function ExercisePanel({
             Verificar
           </Button>
         ) : lastCorrect ? (
-          <div className="rounded-2xl bg-green-soft p-4">
+          <div className="max-h-[70svh] overflow-y-auto rounded-2xl bg-green-soft p-4">
             <p className="font-extrabold text-green">Correto! +{XP_PER_CORRECT} XP</p>
             <p className="mt-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-green">
               Por que está certo
             </p>
-            <p className="mt-1 text-sm leading-relaxed text-white/90">{message}</p>
-            <div className="mt-2">
-              <ExplainListenButton text={message} />
-            </div>
+            <ExplanationBlock text={message} anchors={[exercise.nativePhrase]} />
             <Button className="mt-3 w-full" onClick={onAdvance}>
               Continuar
             </Button>
           </div>
         ) : (
-          <div className="rounded-2xl bg-red-soft p-4">
+          <div className="max-h-[70svh] overflow-y-auto rounded-2xl bg-red-soft p-4">
             <p className="font-extrabold text-red">Ainda não</p>
             <p className="mt-2 text-[11px] font-extrabold uppercase tracking-[0.14em] text-red">
               O motivo correto
             </p>
-            <p className="mt-1 text-sm leading-relaxed text-white/90">{message}</p>
-            <div className="mt-2">
-              <ExplainListenButton text={message} />
-            </div>
+            <ExplanationBlock text={message} anchors={[exercise.nativePhrase]} />
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Button variant="outline" className="border-red text-red" onClick={retryInPlace}>
                 Tentar de novo

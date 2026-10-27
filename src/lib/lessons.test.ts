@@ -4,6 +4,7 @@ import {
   NATIVE_LISTEN_LABEL,
   THEORY_CARD_TITLE,
   challengePassThreshold,
+  unitPassed,
   checkAnswer,
   englishPhrasesOf,
   iterUnits,
@@ -46,9 +47,11 @@ describe('currículo', () => {
     expect(order && checkAnswer(order, [...order.lines].reverse()).correct).toBe(false)
   })
 
-  it('exige cerca de 75% no desafio', () => {
+  it('exige cerca de 75% para abrir a próxima lição ou o próximo patamar', () => {
     expect(challengePassThreshold(4)).toBe(3)
     expect(challengePassThreshold(5)).toBe(4)
+    expect(unitPassed(1, 4)).toBe(false)
+    expect(unitPassed(3, 4)).toBe(true)
   })
 
   it('coloca Explicação Teórica Prática com regra, cultura e exemplos traduzidos', () => {

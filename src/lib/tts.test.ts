@@ -108,12 +108,13 @@ describe('speak() toca MPEG Jenny com Audio()', () => {
   it('se o MPEG for bloqueado, fala o inglês no Web Speech na hora, sem flerte', async () => {
     const play = vi.fn().mockRejectedValue(new DOMException('blocked', 'NotAllowedError'))
     const prompt = "I'm gonna call you later."
-    const { speak, getTtsStatus, speechSpeak } = await loadTts(play)
+    const { unlockTts, speak, getTtsStatus, speechSpeak } = await loadTts(play)
+    unlockTts()
     speak(prompt, 'native')
     await vi.waitFor(() => {
-      expect(speechSpeak).toHaveBeenCalled()
+      expect(speechSpeak.mock.calls.some((call) => (call[0] as SpeechSynthesisUtterance).text === prompt)).toBe(true)
     })
-    const uttered = speechSpeak.mock.calls[0]![0] as SpeechSynthesisUtterance
+    const uttered = speechSpeak.mock.calls.find((call) => (call[0] as SpeechSynthesisUtterance).text === prompt)![0] as SpeechSynthesisUtterance
     expect(uttered.text).toBe(prompt)
     expect(uttered.lang).toBe('en-US')
     expect(uttered.rate).toBe(0.85)
@@ -125,14 +126,48 @@ describe('speak() toca MPEG Jenny com Audio()', () => {
     vi.useFakeTimers()
     const play = vi.fn().mockReturnValue(new Promise(() => {}))
     const prompt = 'Wanna hang out later?'
-    const { speak, getTtsStatus, speechSpeak } = await loadTts(play)
+    const { unlockTts, speak, getTtsStatus, speechSpeak } = await loadTts(play)
+    unlockTts()
     speak(prompt, 'native')
-    expect(speechSpeak).not.toHaveBeenCalled()
+    expect(speechSpeak.mock.calls.some((call) => (call[0] as SpeechSynthesisUtterance).text === prompt)).toBe(false)
     await vi.advanceTimersByTimeAsync(MPEG_GRACE_MS)
-    expect(speechSpeak).toHaveBeenCalled()
-    const uttered = speechSpeak.mock.calls[0]![0] as SpeechSynthesisUtterance
+    expect(speechSpeak.mock.calls.some((call) => (call[0] as SpeechSynthesisUtterance).text === prompt)).toBe(true)
+    const uttered = speechSpeak.mock.calls.find((call) => (call[0] as SpeechSynthesisUtterance).text === prompt)![0] as SpeechSynthesisUtterance
     expect(uttered.text).toBe(prompt)
     expect(getTtsStatus().engine).toBe('webspeech-fallback')
+  })
+
+  it('antes do toque não abre o AudioContext; o toque resume a saída', async () => {
+    const play = vi.fn().mockResolvedValue(undefined)
+    const resume = vi.fn().mockResolvedValue(undefined)
+    const created: string[] = []
+    class FakeAudioContext {
+      state = 'suspended'
+      constructor() {
+        created.push('ctx')
+      }
+      createMediaElementSource() {
+        return { connect: vi.fn() }
+      }
+      createGain() {
+        return { gain: { value: 1 }, connect: vi.fn() }
+      }
+      resume() {
+        this.state = 'running'
+        return resume()
+      }
+    }
+    vi.stubGlobal('window', { addEventListener: vi.fn(), AudioContext: FakeAudioContext })
+    const { initTts, speak, unlockTts, audioInstance, stopTts } = await loadTts(play)
+    audioInstance.canPlayType = () => 'maybe'
+    initTts()
+    speak("I'm gonna call you later.", 'native')
+    await vi.waitFor(() => expect(play).toHaveBeenCalled())
+    expect(created).toEqual([])
+    unlockTts()
+    expect(created).toEqual(['ctx'])
+    expect(resume).toHaveBeenCalled()
+    stopTts()
   })
 
   it('explicação em português usa Francisca e não corta o áudio no segundo toque', async () => {

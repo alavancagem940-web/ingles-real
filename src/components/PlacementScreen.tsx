@@ -31,10 +31,22 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
   const [result, setResult] = useState<PlacementBand | null>(null)
   const [choiceKey, setChoiceKey] = useState('')
   const [choices, setChoices] = useState<string[]>([])
+  const tapped = useRef(false)
+  const [nudge, setNudge] = useState(0)
 
   useEffect(() => {
     const timer = window.setTimeout(() => setReady(true), PLACEMENT_PREP_MS)
     return () => window.clearTimeout(timer)
+  }, [])
+
+  useEffect(() => {
+    const mark = (event: PointerEvent) => {
+      const fromButton = event.target instanceof Element && Boolean(event.target.closest('button'))
+      tapped.current = true
+      if (!fromButton) setNudge((value) => value + 1)
+    }
+    window.addEventListener('pointerdown', mark, { capture: true })
+    return () => window.removeEventListener('pointerdown', mark, { capture: true })
   }, [])
 
   const question = quiz[index]
@@ -44,11 +56,11 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
   }
 
   useEffect(() => {
-    if (!ready || !question || result || question.choicesAreEnglish) return
+    if (!tapped.current || !ready || !question || result || question.choicesAreEnglish) return
     if (question.nativePhrase.trim() === question.answer.trim()) return
     if (question.choices.some((choice) => choice.trim() === question.nativePhrase.trim())) return
     speak(question.nativePhrase, 'native')
-  }, [ready, question, result])
+  }, [ready, question, result, nudge])
 
   if (result) {
     return (

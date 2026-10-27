@@ -67,6 +67,8 @@ const FALLBACK_HINT =
 const UNLOCK_EVENTS = ['pointerdown', 'touchstart', 'click', 'keydown'] as const
 
 let unlocked = false
+let gestureUnlocked = false
+let outputCtx: AudioContext | null = null
 let engine: TtsEngine = HAPPY_PATH_ENGINE
 let voiceId: NeuralVoiceId = DEFAULT_VOICE_ID
 let hint: string | null = null
@@ -153,10 +155,18 @@ function getPlayer(): HTMLAudioElement {
   return player
 }
 
+function resumeOutput(): void {
+  if (outputCtx && outputCtx.state === 'suspended') void outputCtx.resume()
+}
+
 function routePastScrollDuck(audio: HTMLAudioElement): void {
-  if (typeof audio.canPlayType !== 'function') return
+  if (!gestureUnlocked || typeof audio.canPlayType !== 'function') return
   const marked = audio as HTMLAudioElement & { __graph?: boolean }
-  if (marked.__graph) return
+  if (marked.__graph) {
+    resumeOutput()
+    return
+  }
+  if (typeof window === 'undefined') return
   const root = window as Window & { webkitAudioContext?: typeof AudioContext }
   const Ctx = window.AudioContext ?? root.webkitAudioContext
   if (!Ctx) return
@@ -168,6 +178,7 @@ function routePastScrollDuck(audio: HTMLAudioElement): void {
     source.connect(gain)
     gain.connect(ctx.destination)
     marked.__graph = true
+    outputCtx = ctx
     void ctx.resume()
   } catch {
     // A second graph on the same element throws. Playback still uses the element.
@@ -310,6 +321,11 @@ function primeWebSpeech(): void {
 export function unlockTts(): void {
   if (!hasAudioElement() && !speechSynth()) return
   unlocked = true
+  gestureUnlocked = true
+  if (hasAudioElement()) {
+    routePastScrollDuck(getPlayer())
+    resumeOutput()
+  }
   if (!audioPrimed) {
     audioPrimed = true
     primeAudioIfIdle()
@@ -346,6 +362,7 @@ function bindClipEnd(audio: HTMLAudioElement, id: number): void {
 
 function playFromUrl(url: string, clipId: number): Promise<void> {
   const audio = getPlayer()
+  resumeOutput()
   audio.onended = null
   try {
     audio.pause()
@@ -465,7 +482,7 @@ async function playNeural(spoken: string, voice: ClipVoiceId, seq: number, clipI
       // Packed file missing, blocked, or replaced by the next tap.
     }
   }
-  if (seq !== speakSeq) return
+  if (seq !== speakSeq || !gestureUnlocked) return
 
   if (import.meta.env.DEV) {
     for (const candidate of voices) {
@@ -514,9 +531,12 @@ function startClip(text: string, kind: SpeakKind, after: (() => void) | null): v
   followId = clipId
   followFn = after
 
-  graceTimer = setTimeout(() => {
-    startWebSpeechFallback(seq, spoken, voice)
-  }, MPEG_GRACE_MS)
+  if (gestureUnlocked) {
+    resumeOutput()
+    graceTimer = setTimeout(() => {
+      startWebSpeechFallback(seq, spoken, voice)
+    }, MPEG_GRACE_MS)
+  }
 
   void playNeural(spoken, voice, seq, clipId)
 }

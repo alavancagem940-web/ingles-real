@@ -11,7 +11,7 @@ describe('progresso localStorage', () => {
     expect(store.snapshot()).not.toHaveProperty('hearts')
   })
 
-  it('Iniciante destrava o Básico; Intermediário destrava dois patamares', () => {
+  it('Iniciante abre o Básico; Intermediário começa no Intermediário', () => {
     const store = new ProgressStore(createMemoryStorage())
     store.load()
     store.completePlacement('iniciante')
@@ -19,19 +19,21 @@ describe('progresso localStorage', () => {
     expect(store.isLevelUnlocked('intermediario')).toBe(false)
     store.retakePlacement('intermediario')
     expect(store.xp).toBe(0)
+    expect(store.isLevelUnlocked('basico')).toBe(false)
     expect(store.isLevelUnlocked('intermediario')).toBe(true)
     expect(store.isLevelUnlocked('avancado')).toBe(false)
   })
 
-  it('Avançado destrava até o Avançado; Fluência espera o desafio', () => {
+  it('Avançado começa no Avançado; Fluência espera o desafio', () => {
     const store = new ProgressStore(createMemoryStorage())
     store.load()
     store.completePlacement('avancado')
-    expect(store.isLevelUnlocked('basico')).toBe(true)
-    expect(store.isLevelUnlocked('intermediario')).toBe(true)
+    expect(store.isLevelUnlocked('basico')).toBe(false)
+    expect(store.isLevelUnlocked('intermediario')).toBe(false)
     expect(store.isLevelUnlocked('avancado')).toBe(true)
     expect(store.isLevelUnlocked('fluencia')).toBe(false)
     store.markChallengePassed('avancado', 'a4_avancado_desafio', 100)
+    expect(store.isLevelUnlocked('basico')).toBe(false)
     expect(store.isLevelUnlocked('fluencia')).toBe(true)
   })
 
@@ -77,7 +79,7 @@ describe('progresso localStorage', () => {
     expect(second.placementBand).toBe('iniciante')
   })
 
-  it('começa a trilha no patamar do teste, não na primeira lição do Básico', () => {
+  it('a primeira lição aberta é a do patamar, e o caminho segue para cima', () => {
     const store = new ProgressStore(createMemoryStorage())
     store.load()
     store.completePlacement('intermediario')

@@ -1,5 +1,5 @@
 import { Check, Lock, Star, Trophy } from 'lucide-react'
-import { LEVELS, type Level, type Unit } from '../lib/lessons'
+import { levelsFromBand, type Level, type Unit } from '../lib/lessons'
 import { BAND_LABEL } from '../lib/placement'
 import {
   DEFAULT_VOICE_ID,
@@ -26,9 +26,13 @@ const ZIGZAG = ['translate-x-0', 'translate-x-12', '-translate-x-10', 'translate
 
 export function HomePath({ store, tts, onStart, onReset, onRetake, onInstall, canInstall }: HomePathProps) {
   const current = store.currentUnit()
-  const resumeId = store.position?.unitId ?? current?.unit.id
-  const standalone = isStandaloneDisplay()
   const band = store.placementBand
+  const trail = levelsFromBand(band ?? 'iniciante')
+  const savedOnPath = Boolean(
+    store.position?.unitId && trail.some((level) => level.units.some((unit) => unit.id === store.position?.unitId)),
+  )
+  const resumeId = savedOnPath ? store.position?.unitId : current?.unit.id
+  const standalone = isStandaloneDisplay()
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
@@ -36,10 +40,10 @@ export function HomePath({ store, tts, onStart, onReset, onRetake, onInstall, ca
         <h1 className="text-[1.65rem] font-extrabold leading-tight text-white">Sua trilha de inglês falado</h1>
         <p className="mt-1 text-sm leading-relaxed text-muted">
           {band
-            ? `Patamar ${BAND_LABEL[band]}. A bolinha em destaque é a lição desse nível. Cada lição pede cerca de 75% para abrir a próxima.`
+            ? `Patamar ${BAND_LABEL[band]}. A primeira bolinha ensina esse nível, e a trilha segue para o que é mais difícil. Cada lição pede cerca de 75% para abrir a próxima.`
             : 'Faça o teste de nivelamento para destrancar o patamar certo.'}
         </p>
-        {store.position ? (
+        {savedOnPath ? (
           <p className="mt-2 text-sm font-bold text-gold">Você parou no meio de uma lição. Toque na bolinha em destaque para continuar.</p>
         ) : null}
         <p className="mt-2 text-xs text-muted">Leitor de voz: {tts.label}</p>
@@ -84,7 +88,7 @@ export function HomePath({ store, tts, onStart, onReset, onRetake, onInstall, ca
       ) : null}
 
       <ol className="mt-6 flex flex-col gap-10">
-        {LEVELS.map((level) => (
+        {trail.map((level) => (
           <LevelSection
             key={level.id}
             level={level}

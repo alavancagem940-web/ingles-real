@@ -1,16 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import {
-  BAND_LABEL,
-  BAND_UNLOCK_COPY,
-  bandFromProgress,
-  drawPlacementRound,
-  nextPlacementDifficulty,
-  placementPassMark,
-  PLACEMENT_ROUND_SIZE,
-  type PlacementBand,
-  type PlacementDifficulty,
-  type PlacementQuestion,
-} from '../lib/placement'
+import { BAND_LABEL, BAND_UNLOCK_COPY, type PlacementBand, type PlacementDifficulty, type PlacementQuestion } from '../lib/placement'
+import { PLACEMENT_COUNT, PLACEMENT_PREP_MS, bandFromAnswers, generatePlacement } from '../lib/placement-generate'
 import { shuffledChoices } from '../lib/shuffle'
 import { speak, unlockTts } from '../lib/tts'
 import { ExplanationBlock, playExplanation } from './ExplanationBlock'
@@ -31,10 +21,10 @@ type PlacementScreenProps = {
 }
 
 export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onCancel }: PlacementScreenProps) {
-  const [difficulty, setDifficulty] = useState<PlacementDifficulty>('easy')
-  const [round, setRound] = useState<PlacementQuestion[]>(() => drawPlacementRound('easy'))
+  const [quiz] = useState<PlacementQuestion[]>(() => generatePlacement())
+  const [ready, setReady] = useState(false)
   const [index, setIndex] = useState(0)
-  const correctRef = useRef(0)
+  const answersRef = useRef<boolean[]>([])
   const [selected, setSelected] = useState<string | null>(null)
   const [checked, setChecked] = useState(false)
   const [lastCorrect, setLastCorrect] = useState<boolean | null>(null)
@@ -42,18 +32,23 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
   const [choiceKey, setChoiceKey] = useState('')
   const [choices, setChoices] = useState<string[]>([])
 
-  const question = round[index]
+  useEffect(() => {
+    const timer = window.setTimeout(() => setReady(true), PLACEMENT_PREP_MS)
+    return () => window.clearTimeout(timer)
+  }, [])
+
+  const question = quiz[index]
   if (question && choiceKey !== question.id) {
     setChoiceKey(question.id)
     setChoices(shuffledChoices(question.choices))
   }
 
   useEffect(() => {
-    if (!question || result || question.choicesAreEnglish) return
+    if (!ready || !question || result || question.choicesAreEnglish) return
     if (question.nativePhrase.trim() === question.answer.trim()) return
     if (question.choices.some((choice) => choice.trim() === question.nativePhrase.trim())) return
     speak(question.nativePhrase, 'native')
-  }, [question, result])
+  }, [ready, question, result])
 
   if (result) {
     return (
@@ -63,8 +58,8 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
         <p className="mt-3 text-sm leading-relaxed text-muted">{BAND_UNLOCK_COPY[result]}</p>
         <p className="mt-3 text-sm text-muted">
           {retake
-            ? 'O XP e as lições já feitas continuam neste aparelho. Só o patamar de desbloqueio foi atualizado.'
-            : 'A bolinha em destaque na trilha é a primeira lição desse patamar.'}
+            ? 'O XP e as lições já feitas continuam neste aparelho. A trilha passa a começar neste patamar.'
+            : 'A primeira bolinha da trilha ensina este patamar. O caminho segue para o que é mais difícil.'}
         </p>
         <Button className="mt-8" size="lg" onClick={() => onFinished(result)}>
           Ir para a trilha
@@ -73,30 +68,27 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
     )
   }
 
-  if (!question) {
+  if (!ready || !question) {
     return (
-      <div className="flex flex-1 items-center justify-center px-6">
-        <p className="text-muted">Não foi possível carregar o teste.</p>
+      <div className="flex min-h-0 flex-1 flex-col px-5 py-6">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-extrabold uppercase tracking-[0.16em] text-gold">Teste de nivelamento</p>
+          {retake && onCancel ? (
+            <button type="button" className="text-xs font-bold text-muted underline" onClick={onCancel}>
+              Cancelar
+            </button>
+          ) : null}
+        </div>
+        <h1 className="mt-6 text-2xl font-extrabold text-white">Montando sua avaliação</h1>
+        <p className="mt-3 text-sm leading-relaxed text-muted">
+          Gerando {PLACEMENT_COUNT} perguntas de vários níveis. Esta prova não fica salva: se o app abrir de novo sem o
+          progresso deste aparelho, vem outro conjunto.
+        </p>
       </div>
     )
   }
 
-  const progressValue = ((difficultyIndex(difficulty) * PLACEMENT_ROUND_SIZE + index) / (PLACEMENT_ROUND_SIZE * 3)) * 100
-
-  function finishRound(finalCorrect: number) {
-    const next = nextPlacementDifficulty(difficulty, finalCorrect, round.length)
-    if (next === 'done') {
-      setResult(bandFromProgress(difficulty, finalCorrect, round.length))
-      return
-    }
-    setRound(drawPlacementRound(next))
-    setDifficulty(next)
-    setIndex(0)
-    correctRef.current = 0
-    setSelected(null)
-    setChecked(false)
-    setLastCorrect(null)
-  }
+  const progressValue = (index / quiz.length) * 100
 
   function verify() {
     if (!selected || checked) return
@@ -104,14 +96,14 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
     const ok = selected === question.answer
     setChecked(true)
     setLastCorrect(ok)
-    correctRef.current += ok ? 1 : 0
+    answersRef.current[index] = ok
     playExplanation(ok ? question.explainCorrect : question.explainWrong, [question.nativePhrase])
   }
 
   function advance() {
     const nextIndex = index + 1
-    if (nextIndex >= round.length) {
-      finishRound(correctRef.current)
+    if (nextIndex >= quiz.length) {
+      setResult(bandFromAnswers(quiz, answersRef.current))
       return
     }
     setIndex(nextIndex)
@@ -131,17 +123,16 @@ export function PlacementScreen({ retake, seenTerms, onSeenTerm, onFinished, onC
             </button>
           ) : null}
         </div>
-        <h1 className="mt-2 text-xl font-extrabold text-white">Perguntas progressivas</h1>
+        <h1 className="mt-2 text-xl font-extrabold text-white">Avaliação de {quiz.length} perguntas</h1>
         <p className="mt-1 text-xs text-muted">
-          Fácil → difícil. Acertar {placementPassMark(round.length)} de {round.length} neste bloco sobe o nível.
-          As perguntas mudam cada vez que você faz o teste.
+          Fácil, médio e difícil misturados. O Avançado só fecha se os três blocos forem bem. Esta prova foi montada agora.
         </p>
         <Progress className="mt-3" value={progressValue} />
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pt-4 pb-36">
         <p className="text-xs font-bold text-muted">
-          Bloco {labelDifficulty(difficulty)} · pergunta {index + 1} de {round.length}
+          {labelDifficulty(question.difficulty)} · pergunta {index + 1} de {quiz.length}
         </p>
         <div className="mt-2 text-lg font-extrabold leading-snug text-white">
           <GlossaryText text={question.prompt} seen={seenTerms} onSeen={onSeenTerm} />
@@ -242,12 +233,6 @@ function ChoiceRow({
       )}
     </li>
   )
-}
-
-function difficultyIndex(difficulty: PlacementDifficulty): number {
-  if (difficulty === 'easy') return 0
-  if (difficulty === 'medium') return 1
-  return 2
 }
 
 function labelDifficulty(difficulty: PlacementDifficulty): string {

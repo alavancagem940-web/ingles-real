@@ -10,8 +10,9 @@ import {
   iterUnits,
   spokenTheory,
   validateCurriculum,
+  levelsFromBand,
 } from './lessons'
-import { PLACEMENT_QUESTIONS } from './placement'
+import { PLACEMENT_BANK } from './placement-bank'
 
 describe('currículo', () => {
   it('valida a trilha do Básico à Fluência', () => {
@@ -95,8 +96,14 @@ describe('currículo', () => {
         expect(englishPhrasesOf(exercise).length).toBeGreaterThan(0)
       }
     }
-    for (const question of PLACEMENT_QUESTIONS) {
-      expect(question.nativePhrase.trim().length).toBeGreaterThan(2)
+    for (const seed of PLACEMENT_BANK) {
+      expect(seed.english.trim().length).toBeGreaterThan(2)
     }
+  })
+
+  it('a trilha visível começa no patamar e segue só para o que é mais difícil', () => {
+    expect(levelsFromBand('avancado').map((level) => level.id)).toEqual(['avancado', 'fluencia'])
+    expect(levelsFromBand('intermediario').map((level) => level.id)).toEqual(['intermediario', 'avancado', 'fluencia'])
+    expect(levelsFromBand('iniciante').map((level) => level.id)).toEqual(['basico', 'intermediario', 'avancado', 'fluencia'])
   })
 })

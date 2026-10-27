@@ -1,4 +1,4 @@
-import { PLACEMENT_QUESTIONS } from './placement'
+import { placementAudioLines } from './placement-bank'
 import { LEVELS, spokenExplanation, spokenNative, spokenTheory } from './lessons'
 import { type SpeakKind, toSpokenText } from './speech-persona'
 import { GLOSSARY } from './glossary'
@@ -291,12 +291,7 @@ export function collectSpokenLines(): SpokenLine[] {
     for (const phrase of term.spokenEnglish) add(phrase, 'native')
   }
 
-  for (const question of PLACEMENT_QUESTIONS) {
-    add(question.nativePhrase, 'native')
-    add(question.explainCorrect, 'explain')
-    add(question.explainWrong, 'explain')
-    for (const choice of question.choices) add(choice, question.choicesAreEnglish ? 'choice' : 'explain')
-  }
+  for (const line of placementAudioLines()) add(line.spoken, line.kind)
 
   return lines
 }

@@ -232,10 +232,11 @@ export class ProgressStore {
       return this.passedChallenges.includes('avancado')
     }
     const floor = this.placementBand ? bandRank(this.placementBand) : 0
-    if (rank <= floor) return true
+    if (rank < floor) return false
+    if (rank === floor) return true
     const ids = LEVELS.map((level) => level.id)
     const index = ids.indexOf(levelId)
-    if (index <= 0) return true
+    if (index <= 0) return false
     const previous = ids[index - 1]
     return previous !== undefined && this.passedChallenges.includes(previous)
   }
@@ -263,16 +264,7 @@ export class ProgressStore {
   }
 
   currentUnit(): { level: Level; unit: Unit } | null {
-    const startRank = this.placementBand ? bandRank(this.placementBand) : 0
-    const ordered = [...LEVELS].sort((left, right) => {
-      const leftRank = levelUnlockRank(left.id)
-      const rightRank = levelUnlockRank(right.id)
-      const leftPref = leftRank >= startRank ? 0 : 1
-      const rightPref = rightRank >= startRank ? 0 : 1
-      if (leftPref !== rightPref) return leftPref - rightPref
-      return leftRank - rightRank
-    })
-    for (const level of ordered) {
+    for (const level of LEVELS) {
       for (const unit of level.units) {
         if (this.isUnitUnlocked(level.id, unit.id) && !this.completedUnits.includes(unit.id)) {
           return { level, unit }

@@ -69,8 +69,11 @@ export default function App() {
           return
         }
         if (store.position?.unitId && unitById(store.position.unitId)) {
-          setScreen({ name: 'lesson', unitId: store.position.unitId })
-          return
+          const level = levelForUnit(store.position.unitId)
+          if (level && store.isUnitUnlocked(level.id, store.position.unitId)) {
+            setScreen({ name: 'lesson', unitId: store.position.unitId })
+            return
+          }
         }
         setScreen({ name: 'home' })
       } catch (error) {

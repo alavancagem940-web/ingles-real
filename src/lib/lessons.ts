@@ -2,8 +2,11 @@ import { LEVELS } from './curriculum'
 import {
   assertExplanation,
   assertTheoryComplete,
+  bandRank,
+  levelUnlockRank,
   type Exercise,
   type Level,
+  type PlacementBand,
   type Unit,
 } from './lesson-core'
 
@@ -33,6 +36,12 @@ export {
 
 export function getLevel(levelId: string): Level | undefined {
   return LEVELS.find((level) => level.id === levelId)
+}
+
+/** The trail starts at the assessed band and only continues into harder levels. */
+export function levelsFromBand(band: PlacementBand): Level[] {
+  const start = bandRank(band)
+  return LEVELS.filter((level) => levelUnlockRank(level.id) >= start)
 }
 
 export function unitById(unitId: string): Unit | undefined {
